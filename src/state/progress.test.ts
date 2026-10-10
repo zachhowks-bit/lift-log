@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db, ensureSeeded } from '../db/db';
-import { backupOverdue, currentWeekSets, exerciseHistory, kneeRisingNow, kneeTrend } from './progress';
+import { backupOverdue, currentWeekSets, exerciseHistory, kneeRisingNow, kneeTrend, loggedExercises } from './progress';
 import { finishSession, logSet, startNextSession } from './session';
 import type { SetLog } from '../types';
 
@@ -69,5 +69,20 @@ describe('backupOverdue', () => {
     await db.settings.update('main', { lastBackupAt: T0 });
     expect(await backupOverdue(T0 + 7 * DAY)).toBe(false);
     expect(await backupOverdue(T0 + 7 * DAY + 1)).toBe(true);
+  });
+});
+
+describe('loggedExercises', () => {
+  it('lists exercises with a set in a finished session, by name', async () => {
+    expect(await loggedExercises()).toEqual([]);
+    const s = await startNextSession(T0);
+    await logSet(s.id!, 'latPulldown', set(), T0);
+    await logSet(s.id!, 'bench', set(), T0 + 1);
+    expect(await loggedExercises()).toEqual([]); // still in progress
+    await finishSession(s.id!, T0 + 1000);
+    expect(await loggedExercises()).toEqual([
+      { id: 'bench', name: 'Barbell bench press' },
+      { id: 'latPulldown', name: 'Lat pulldown' },
+    ]);
   });
 });

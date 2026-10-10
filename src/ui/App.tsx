@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { unlockAudio } from './audio';
 import Toast, { type ToastMsg } from './components/Toast';
 import CheckIn from './screens/CheckIn';
 import Home from './screens/Home';
-import Progress from './screens/Progress';
 import Settings from './screens/Settings';
 import Workout from './screens/Workout';
+
+// Recharts is large; load the Progress screen (and its charts) only when opened.
+const Progress = lazy(() => import('./screens/Progress'));
 
 export type Screen = 'home' | 'workout' | 'progress' | 'settings' | 'checkin';
 
@@ -41,9 +43,13 @@ export default function App({ initial = 'home' }: { initial?: Screen }) {
         <Home onOpenWorkout={() => setScreen('workout')} onOpenCheckIn={() => setScreen('checkin')} onError={showError} />
       )}
       {screen === 'workout' && <Workout onExit={goHome} onFinished={finished} onError={showError} />}
-      {screen === 'progress' && <Progress />}
-      {screen === 'settings' && <Settings />}
-      {screen === 'checkin' && <CheckIn onDone={goHome} />}
+      {screen === 'progress' && (
+        <Suspense fallback={<main className="screen"><p className="hint">Loading…</p></main>}>
+          <Progress onError={showError} />
+        </Suspense>
+      )}
+      {screen === 'settings' && <Settings onError={showError} />}
+      {screen === 'checkin' && <CheckIn onDone={goHome} onError={showError} />}
       {screen !== 'workout' && (
         <nav className="tabs" aria-label="Main">
           {TABS.map((t) => (

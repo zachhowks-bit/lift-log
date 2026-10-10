@@ -54,3 +54,12 @@ export async function backupOverdue(now: number): Promise<boolean> {
   if (last === null) return (await finishedAsc()).length >= 1;
   return now - last > 7 * DAY_MS;
 }
+
+/** Exercises with at least one set in a finished session, sorted by name. */
+export async function loggedExercises(): Promise<{ id: string; name: string }[]> {
+  const ids = new Set<string>();
+  for (const s of await finishedAsc()) for (const e of s.entries) if (e.sets.length > 0) ids.add(e.exerciseId);
+  const out: { id: string; name: string }[] = [];
+  for (const ex of await db.exercises.bulkGet([...ids])) if (ex) out.push({ id: ex.id, name: ex.name });
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
