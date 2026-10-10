@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { nextPrescription } from './progression';
 import { roundTo } from './round';
-import { entry, bench, legPress, dbCurl } from './testutil';
+import { entry, bench, legPress, dbCurl } from './__tests__/testutil';
+import type { Prescription } from '../types';
+
+function expectNoNaN(p: Prescription) {
+  for (const [k, v] of Object.entries(p)) {
+    if (typeof v === 'number') expect(Number.isFinite(v), k).toBe(true);
+  }
+  expect(p.targetReps.every((n) => Number.isFinite(n))).toBe(true);
+  expect(p.targetReps).toHaveLength(p.sets);
+  if (p.weight !== null) expect(Number.isFinite(p.weight)).toBe(true);
+}
 
 const ctx = (o: Partial<{ week: number; daysSinceLast: number | null; sets: number }> = {}) =>
   ({ week: 1, daysSinceLast: 3, sets: 3, ...o });
@@ -21,7 +31,7 @@ describe('nextPrescription', () => {
     expect(p.needsCalibration).toBe(true);
     expect(p.sets).toBe(2);
     expect(p.targetReps).toHaveLength(2);
-    expect(JSON.stringify(p)).not.toContain('NaN');
+    expectNoNaN(p);
   });
   it('increases when all sets hit repMax with RIR>=1', () => {
     const p = nextPrescription(bench, [entry(60, [10, 10, 10], [1, 1, 1])], ctx());
@@ -126,6 +136,13 @@ describe('nextPrescription', () => {
     const q = nextPrescription(bench, [entry(60, [8, 8, 8], [1, 1, 1])], ctx({ week: 5, daysSinceLast: 12 }));
     expect(q.why).toBe('−10%: back after 12 days. Deload week: lighter, easy reps');
   });
+  it('double miss with knee pain >= 6 gives last top x 0.9, not compounded', () => {
+    const m = entry(100, [8, 9], [0, 1], { knee: 6, repMin: 10 });
+    const p = nextPrescription(legPress, [m, m], ctx({ sets: 2 }));
+    expect(p.weight).toBe(90);
+    expect(p.suggestSwap).toBe(true);
+    expect(p.why).toBe('−10% + try a swap: knee pain 6');
+  });
   it('small dumbbell double miss never below one increment', () => {
     const m = entry(5, [8, 9, 9], [0, 1, 1], { repMin: 10 });
     const p = nextPrescription(dbCurl, [m, m], ctx());
@@ -144,6 +161,6 @@ describe('nextPrescription', () => {
     expect(Object.keys(p).sort()).toEqual(['exerciseId', 'needsCalibration', 'repMax', 'repMin', 'restSec', 'sets',
       'suggestSwap', 'targetReps', 'targetRir', 'weight', 'why']);
     expect(p.targetReps).toHaveLength(p.sets);
-    expect(JSON.stringify(p)).not.toContain('NaN');
+    expectNoNaN(p);
   });
 });

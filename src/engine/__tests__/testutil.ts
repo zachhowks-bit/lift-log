@@ -1,4 +1,4 @@
-import type { Exercise, ExerciseEntry, Prescription } from '../types';
+import type { Exercise, ExerciseEntry, Prescription } from '../../types';
 
 export const bench: Exercise = { id: 'bench', name: 'Bench', type: 'H', primary: ['chest'], secondary: [],
   equipment: 'barbell', increment: 2.5, lower: false, kneeSensitive: false, alternatives: [], avoid: false };
