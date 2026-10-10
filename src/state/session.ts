@@ -38,7 +38,7 @@ function buildEntry(ex: Exercise, finished: Session[], state: ProgramState, week
     const e = s.entries.find((x) => x.exerciseId === ex.id);
     if (e) history.push(e);
   }
-  const last = finished.find((s) => s.entries.some((e) => e.exerciseId === ex.id));
+  const last = finished[0];
   const daysSinceLast = last && last.finishedAt !== null
     ? Math.floor((now - last.finishedAt) / DAY_MS)
     : null;
@@ -55,23 +55,25 @@ export async function getActiveSession(): Promise<Session | null> {
 }
 
 export async function startNextSession(now: number): Promise<Session> {
-  const existing = await getActiveSession();
-  if (existing) return existing;
-  const state = await getState();
-  const slot: SlotId = SLOT_ORDER[state.nextSlotIndex % SLOT_ORDER.length];
-  const week = weekInBlock(state.sessionsInBlock);
-  const lib = await loadLib();
-  const tpl = await db.templates.get(slot);
-  const finished = await finishedSessionsNewestFirst();
-  const entries = (tpl?.ids ?? [])
-    .filter((id) => lib[id] && !lib[id].avoid)
-    .map((id) => buildEntry(lib[id], finished, state, week, now));
-  const session: Session = {
-    slot, startedAt: now, finishedAt: null, blockNumber: state.blockNumber, weekInBlock: week,
-    entries, restEndsAt: null, lastLoggedExerciseId: null,
-  };
-  session.id = await db.sessions.add(session);
-  return session;
+  return db.transaction('rw', [db.sessions, db.exercises, db.templates, db.programState], async () => {
+    const existing = await getActiveSession();
+    if (existing) return existing;
+    const state = await getState();
+    const slot: SlotId = SLOT_ORDER[state.nextSlotIndex % SLOT_ORDER.length];
+    const week = weekInBlock(state.sessionsInBlock);
+    const lib = await loadLib();
+    const tpl = await db.templates.get(slot);
+    const finished = await finishedSessionsNewestFirst();
+    const entries = (tpl?.ids ?? [])
+      .filter((id) => lib[id] && !lib[id].avoid)
+      .map((id) => buildEntry(lib[id], finished, state, week, now));
+    const session: Session = {
+      slot, startedAt: now, finishedAt: null, blockNumber: state.blockNumber, weekInBlock: week,
+      entries, restEndsAt: null, lastLoggedExerciseId: null,
+    };
+    session.id = await db.sessions.add(session);
+    return session;
+  });
 }
 
 const isWhole = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n);
@@ -118,7 +120,7 @@ export async function logSet(sessionId: number, exerciseId: string, set: SetLog,
     if (entry.sets.length === 0 && s.entries.slice(0, idx).some((e) => e.sets.length === 0)) {
       entry.doneOutOfOrder = true;
     }
-    entry.sets.push({ ...set });
+    entry.sets.push({ ...set, restTakenSec: null, restSkipped: false });
     const ex = lib[exerciseId];
     s.restEndsAt = now + (ex ? restFor(ex, set) : 0) * 1000;
     s.lastLoggedExerciseId = exerciseId;
@@ -151,6 +153,7 @@ export async function swapExercise(sessionId: number, fromId: string, toId: stri
     const idx = s.entries.findIndex((e) => e.exerciseId === fromId);
     if (idx < 0) throw new Error('Exercise is not in this session.');
     if (s.entries[idx].sets.length > 0) throw new Error("Can't swap after logging sets.");
+    if (s.entries.some((e) => e.exerciseId === toId)) throw new Error('That exercise is already in this workout.');
     const to = await db.exercises.get(toId);
     if (!to || to.avoid) throw new Error('That exercise is not available.');
     const state = await getState();
@@ -225,6 +228,7 @@ export async function blockProgressPct(): Promise<number> {
 }
 
 export async function submitCheckIn(answers: CheckInAnswers, now = Date.now()): Promise<string[]> {
+  if (!(await isCheckInDue())) throw new Error('Check-in is not due yet.');
   const pct = await blockProgressPct();
   return db.transaction('rw', [db.exercises, db.templates, db.programState, db.checkIns, db.sessions], async () => {
     const state = await getState();

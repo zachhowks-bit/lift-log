@@ -74,12 +74,13 @@ describe('session flow', () => {
     const id = s.entries[0].exerciseId;
     await logSet(s.id!, id, set(), T0 + 500);
     await logSet(s.id!, id, set(), T0 + 900);
+    const ex = (await db.exercises.get(id))!;
     db.close();
     await db.open();
     const back = await getActiveSession();
     expect(back?.id).toBe(s.id);
     expect(back?.entries[0].sets).toHaveLength(2);
-    expect(back?.restEndsAt).not.toBeNull();
+    expect(back?.restEndsAt).toBe(T0 + 900 + restFor(ex, set()) * 1000);
   });
 
   it('rest end time = now + restFor', async () => {
@@ -150,19 +151,102 @@ describe('session flow', () => {
     await expect(swapExercise(s.id!, to, from)).rejects.toThrow("Can't swap after logging sets.");
   });
 
-  it('prescribes from history after a finished session', async () => {
-    const first = await runSession(T0, { weight: 62.5 });
-    const next = await startNextSession(T0 + 7 * DAY);
-    expect(first.slot).toBe('upperA');
-    expect(next.slot).toBe('lowerA');
-    // upperA again after 4 sessions
-    for (let i = 0; i < 3; i++) await runSession(T0 + (i + 8) * DAY);
+  it('no break cut when the gap since the last session overall is under 10 days', async () => {
+    const first = await runSession(T0, { weight: 60, fullReps: 8, rir: 2 });
+    const id = first.entries[0].exerciseId;
+    for (let i = 0; i < 3; i++) await runSession(T0 + (8 + i) * DAY);
     const again = await startNextSession(T0 + 20 * DAY);
+    const e = again.entries.find((x) => x.exerciseId === id)!;
     expect(again.slot).toBe('upperA');
-    expect(again.weekInBlock).toBe(2);
-    const e = again.entries.find((x) => x.exerciseId === first.entries[0].exerciseId)!;
-    expect(e.prescription.needsCalibration).toBe(false);
-    expect(e.prescription.weight).not.toBeNull();
+    expect(e.prescription.weight).toBe(60);
+    expect(e.prescription.why).not.toMatch(/back after/);
+  });
+
+  it('applies the break cut when the gap since the last session is 10+ days', async () => {
+    const first = await runSession(T0, { weight: 60, fullReps: 8, rir: 2 });
+    const id = first.entries[0].exerciseId;
+    for (let i = 0; i < 3; i++) await runSession(T0 + (8 + i) * DAY);
+    const again = await startNextSession(T0 + 30 * DAY);
+    const e = again.entries.find((x) => x.exerciseId === id)!;
+    expect(e.prescription.weight).toBeLessThan(60);
+    expect(e.prescription.why).toMatch(/^−10%: back after \d+ days/);
+  });
+
+  it('ignores restSkipped passed by the caller', async () => {
+    const s = await startNextSession(T0);
+    const out = await logSet(s.id!, s.entries[0].exerciseId, set({ restSkipped: true, restTakenSec: 5 }), T0);
+    expect(out.entries[0].sets[0].restSkipped).toBe(false);
+    expect(out.entries[0].sets[0].restTakenSec).toBeNull();
+  });
+
+  it('swap refuses an exercise already in the workout', async () => {
+    const s = await startNextSession(T0);
+    await expect(swapExercise(s.id!, s.entries[0].exerciseId, s.entries[1].exerciseId))
+      .rejects.toThrow('That exercise is already in this workout.');
+  });
+
+  it('concurrent starts create only one session', async () => {
+    const [a, b] = await Promise.all([startNextSession(T0), startNextSession(T0 + 1)]);
+    expect(a.id).toBe(b.id);
+    expect(await db.sessions.count()).toBe(1);
+  });
+
+  it('submitCheckIn refuses before 20 sessions', async () => {
+    await expect(submitCheckIn({ recovery: 'sometimes', knee: 'same', swapIds: [], motivation: 'ok' }))
+      .rejects.toThrow('Check-in is not due yet.');
+    expect(await db.checkIns.count()).toBe(0);
+  });
+
+  it('no ramp after only 3 sessions', async () => {
+    const before = await db.programState.get('main');
+    for (let i = 0; i < 3; i++) await runSession(T0 + i * DAY, { kneePain: 1 });
+    const after = await db.programState.get('main');
+    expect(after?.volumeTargets).toEqual(before?.volumeTargets);
+    expect(after?.setsByExercise).toEqual({});
+  });
+
+  it('no ramp when legRampFrozen', async () => {
+    await db.programState.update('main', { legRampFrozen: true });
+    const before = await db.programState.get('main');
+    for (let i = 0; i < 4; i++) await runSession(T0 + i * DAY, { kneePain: 1 });
+    const after = await db.programState.get('main');
+    expect(after?.sessionsInBlock).toBe(4);
+    expect(after?.volumeTargets).toEqual(before?.volumeTargets);
+  });
+
+  it('blockProgressPct counts exercises that progressed (exact)', async () => {
+    // two sessions of the same slot-less exercise set: bench progresses, other first exercises do not exist
+    const s1 = await startNextSession(T0);
+    const id = s1.entries[0].exerciseId;
+    await logSet(s1.id!, id, set({ weight: 60 }), T0);
+    const other = s1.entries[1].exerciseId;
+    await logSet(s1.id!, other, set({ weight: 40 }), T0 + 1);
+    await finishSession(s1.id!, T0 + 2);
+    // hand-build a second finished session with the same exercises: one up, one flat
+    const mk = (w1: number, w2: number) => ({
+      ...s1, id: undefined, startedAt: T0 + DAY, finishedAt: T0 + DAY + 5,
+      entries: [
+        { ...s1.entries[0], sets: [set({ weight: w1 })] },
+        { ...s1.entries[1], sets: [set({ weight: w2 })] },
+      ],
+    });
+    await db.sessions.add(mk(65, 40));
+    expect(await blockProgressPct()).toBe(50);
+  });
+
+  it('submitCheckIn saves templates', async () => {
+    for (let i = 0; i < 20; i++) {
+      const s = await startNextSession(T0 + i * DAY);
+      await logSet(s.id!, s.entries[0].exerciseId, set({ weight: 60 + i }), T0 + i * DAY + 1);
+      await finishSession(s.id!, T0 + i * DAY + 5000);
+    }
+    const tplBefore = (await db.templates.toArray()).map((t) => t.ids.join());
+    const swapId = (await db.templates.get('upperA'))!.ids[0];
+    const changes = await submitCheckIn({ recovery: 'sometimes', knee: 'same', swapIds: [swapId], motivation: 'ok' });
+    expect(changes.some((c) => c.startsWith('Swapped'))).toBe(true);
+    const upperA = (await db.templates.get('upperA'))!.ids;
+    expect(upperA).not.toContain(swapId);
+    expect((await db.templates.toArray()).map((t) => t.ids.join())).not.toEqual(tplBefore);
   });
 
   it('ramps leg sets after 4 sessions with low knee pain', async () => {
