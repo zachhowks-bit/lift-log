@@ -14,7 +14,8 @@ export interface Prescription { exerciseId: string; weight: number | null; sets:
 export interface ExerciseEntry { exerciseId: string; prescription: Prescription; doneOutOfOrder: boolean;
   isDeload: boolean; sets: SetLog[]; }
 export interface Session { id?: number; slot: SlotId; startedAt: number; finishedAt: number | null;
-  blockNumber: number; weekInBlock: number; entries: ExerciseEntry[]; restEndsAt: number | null; }
+  blockNumber: number; weekInBlock: number; entries: ExerciseEntry[]; restEndsAt: number | null;
+  lastLoggedExerciseId?: string | null; }
 export interface ProgramState { id: 'main'; nextSlotIndex: number; blockNumber: number; sessionsInBlock: number;
   volumeTargets: Record<Muscle, number>; setsByExercise: Record<string, number>; legRampFrozen: boolean; }
 export interface CheckInAnswers { recovery: 'rarely' | 'sometimes' | 'often'; knee: 'better' | 'same' | 'worse';
