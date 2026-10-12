@@ -11,6 +11,8 @@ App link: https://zachhowks-bit.github.io/lift-log/
 3. Tap **Add to Home Screen**, then **Add**.
 4. From now on, open Lift Log from its icon on your Home Screen.
 
+**Always open Lift Log from the Home Screen icon, not from Safari.** Safari and the icon keep separate data, so workouts logged in Safari won't show up in the app. Open it once from the icon while you're online, so it can work offline after that.
+
 ## Back up your data every week
 
 Your workouts are stored **only on your phone**. If you delete the icon, the data can be deleted too.
