@@ -67,7 +67,6 @@ h1, h2, h3, p { margin: 0; }
 .btn-primary { background: var(--accent); color: var(--accent-ink); }
 .btn-big { min-height: 64px; font-size: 22px; width: 100%; }
 .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--text); width: 100%; }
-.btn-accent-outline { background: transparent; border: 2px solid var(--accent); color: var(--accent); width: 100%; }
 .btn-link { background: none; border: 0; color: var(--accent); font-weight: 600; padding: 0; min-height: 44px; text-align: left; }
 .btn-finish { width: 100%; min-height: 56px; font-size: 19px; margin-top: 8px; background: var(--surface-2); border: 2px solid var(--line); }
 

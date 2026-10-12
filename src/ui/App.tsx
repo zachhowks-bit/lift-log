@@ -50,7 +50,7 @@ export default function App({ initial = 'home' }: { initial?: Screen }) {
       )}
       {screen === 'settings' && <Settings onError={showError} />}
       {screen === 'checkin' && <CheckIn onDone={goHome} onError={showError} />}
-      {screen !== 'workout' && (
+      {screen !== 'workout' && screen !== 'checkin' && (
         <nav className="tabs" aria-label="Main">
           {TABS.map((t) => (
             <button key={t.id} type="button" className={screen === t.id ? 'tab tab-on' : 'tab'}

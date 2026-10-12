@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { db, ensureSeeded } from '../../db/db';
 import App from '../App';
+import { startNextSession } from '../../state/session';
 
 beforeEach(async () => {
   await db.delete();
@@ -30,7 +31,20 @@ describe('Home', () => {
     await db.programState.put({ ...st, sessionsInBlock: 20 });
     render(<App />);
     expect(await screen.findByText('Knee pain rising — see a physio.')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Block check-in due' }));
+    expect(screen.queryByRole('button', { name: 'Start' })).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Main' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Do block check-in' }));
     expect(await screen.findByRole('heading', { name: 'Block check-in' })).toBeTruthy();
+    expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
+    expect(await db.sessions.count()).toBe(0);
+  });
+
+  it('still allows resuming an active session while the check-in is due', async () => {
+    await startNextSession(Date.now());
+    const st = (await db.programState.get('main'))!;
+    await db.programState.put({ ...st, sessionsInBlock: 20 });
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Resume' }));
+    expect(await screen.findByRole('button', { name: 'Finish workout' })).toBeTruthy();
   });
 });

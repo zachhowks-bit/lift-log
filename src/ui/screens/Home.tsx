@@ -40,6 +40,8 @@ export default function Home({ onOpenWorkout, onOpenCheckIn, onError }: Props) {
 
   if (!info) return <main className="screen"><p className="hint">Loading…</p></main>;
   const resuming = info.activeSessionId !== null;
+  // A due check-in blocks new workouts (else every later session is a deload); resuming is still fine.
+  const checkInFirst = info.checkInDue && !resuming;
 
   return (
     <main className="screen home">
@@ -51,13 +53,19 @@ export default function Home({ onOpenWorkout, onOpenCheckIn, onError }: Props) {
       <section className="hero">
         <h2 className="hero-slot">{resuming ? 'In progress' : 'Next'}: {info.slotName}</h2>
         <p className="hero-block">Block {info.blockNumber} · Week {info.week} · {info.targetRir}</p>
-        <button type="button" className="btn btn-primary btn-big" disabled={busy} onClick={() => void start()}>
-          {resuming ? 'Resume' : 'Start'}
-        </button>
+        {checkInFirst ? (
+          <>
+            <p className="hint">Block finished. Do the check-in to set up your next block.</p>
+            <button type="button" className="btn btn-primary btn-big" onClick={onOpenCheckIn}>
+              Do block check-in
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn btn-primary btn-big" disabled={busy} onClick={() => void start()}>
+            {resuming ? 'Resume' : 'Start'}
+          </button>
+        )}
       </section>
-      {info.checkInDue && (
-        <button type="button" className="btn btn-accent-outline" onClick={onOpenCheckIn}>Block check-in due</button>
-      )}
       <section className="last">
         <h3 className="section-label">Last session</h3>
         {info.lastSession ? (
