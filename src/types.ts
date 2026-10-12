@@ -15,7 +15,9 @@ export interface ExerciseEntry { exerciseId: string; prescription: Prescription;
   isDeload: boolean; sets: SetLog[]; }
 export interface Session { id?: number; slot: SlotId; startedAt: number; finishedAt: number | null;
   blockNumber: number; weekInBlock: number; entries: ExerciseEntry[]; restEndsAt: number | null;
-  lastLoggedExerciseId?: string | null; }
+  lastLoggedExerciseId?: string | null;
+  /** Rest was skipped after the last logged set; the next set of that same exercise is marked restSkipped. */
+  restSkippedPending?: boolean; }
 export interface ProgramState { id: 'main'; nextSlotIndex: number; blockNumber: number; sessionsInBlock: number;
   volumeTargets: Record<Muscle, number>; setsByExercise: Record<string, number>; legRampFrozen: boolean; }
 export interface CheckInAnswers { recovery: 'rarely' | 'sometimes' | 'often'; knee: 'better' | 'same' | 'worse';

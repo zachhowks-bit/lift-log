@@ -64,7 +64,8 @@ describe('Workout', () => {
     await vi.waitFor(() => expect(screen.queryByRole('timer')).toBeNull(), { timeout: 2000 });
     const active = await getActiveSession();
     expect(active?.restEndsAt).toBeNull();
-    expect(active?.entries[0].sets[0].restSkipped).toBe(true);
+    expect(active?.restSkippedPending).toBe(true);
+    expect(active?.entries[0].sets[0].restSkipped).toBe(false);
   });
 
   it('confirms before finishing with empty exercises and returns home', async () => {

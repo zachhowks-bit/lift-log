@@ -112,7 +112,7 @@ export async function logSet(sessionId: number, exerciseId: string, set: SetLog,
       ? s.entries.find((e) => e.exerciseId === s.lastLoggedExerciseId)
       : undefined;
     const prevSet = prev?.sets[prev.sets.length - 1];
-    if (prev && prevSet && prevSet.restTakenSec === null && !prevSet.restSkipped && lib[prev.exerciseId]) {
+    if (prev && prevSet && prevSet.restTakenSec === null && lib[prev.exerciseId]) {
       prevSet.restTakenSec = restFor(lib[prev.exerciseId], prevSet);
     }
 
@@ -120,7 +120,9 @@ export async function logSet(sessionId: number, exerciseId: string, set: SetLog,
     if (entry.sets.length === 0 && s.entries.slice(0, idx).some((e) => e.sets.length === 0)) {
       entry.doneOutOfOrder = true;
     }
-    entry.sets.push({ ...set, restTakenSec: null, restSkipped: false });
+    const skipped = !!s.restSkippedPending && exerciseId === s.lastLoggedExerciseId;
+    entry.sets.push({ ...set, restTakenSec: null, restSkipped: skipped });
+    s.restSkippedPending = false;
     const ex = lib[exerciseId];
     s.restEndsAt = now + (ex ? restFor(ex, set) : 0) * 1000;
     s.lastLoggedExerciseId = exerciseId;
@@ -138,10 +140,10 @@ export async function skipRest(sessionId: number, now: number): Promise<Session>
     const ex = entry ? await db.exercises.get(entry.exerciseId) : undefined;
     if (last && ex) {
       const planned = restFor(ex, last);
-      last.restSkipped = true;
       last.restTakenSec = Math.max(0, Math.round((now - (s.restEndsAt - planned * 1000)) / 1000));
     }
     s.restEndsAt = null;
+    s.restSkippedPending = true;
     await db.sessions.put(s);
     return s;
   });
@@ -169,6 +171,7 @@ export async function finishSession(sessionId: number, now: number): Promise<{ c
     const s = await openSession(sessionId);
     s.finishedAt = now;
     s.restEndsAt = null;
+    s.restSkippedPending = false;
     await db.sessions.put(s);
 
     let state = await getState();

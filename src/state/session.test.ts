@@ -6,6 +6,7 @@ import {
   submitCheckIn, swapExercise, validateSet,
 } from './session';
 import { restFor } from '../engine/rules';
+import { isValidExposure } from '../engine/stall';
 import type { SetLog } from '../types';
 
 const set = (o: Partial<SetLog> = {}): SetLog => ({
@@ -118,16 +119,66 @@ describe('session flow', () => {
     expect(ok.entries[0].doneOutOfOrder).toBe(false);
   });
 
-  it('skipRest marks restSkipped and clears restEndsAt; no-op when no rest', async () => {
+  it('skipRest records rest taken, clears restEndsAt, keeps the finished set valid; no-op when no rest', async () => {
     const s = await startNextSession(T0);
     const id = s.entries[0].exerciseId;
     expect((await skipRest(s.id!, T0)).restEndsAt).toBeNull();
     await logSet(s.id!, id, set(), T0);
     const out = await skipRest(s.id!, T0 + 20_000);
     expect(out.restEndsAt).toBeNull();
+    expect(out.restSkippedPending).toBe(true);
     const last = out.entries[0].sets[0];
-    expect(last.restSkipped).toBe(true);
+    expect(last.restSkipped).toBe(false);
     expect(last.restTakenSec).toBe(20);
+  });
+
+  it('a skipped rest invalidates the next set of the same exercise', async () => {
+    const s = await startNextSession(T0);
+    const id = s.entries[0].exerciseId;
+    await logSet(s.id!, id, set(), T0);
+    await skipRest(s.id!, T0 + 20_000);
+    const out = await logSet(s.id!, id, set(), T0 + 30_000);
+    expect(out.entries[0].sets[0].restSkipped).toBe(false);
+    expect(out.entries[0].sets[0].restTakenSec).toBe(20);
+    expect(out.entries[0].sets[1].restSkipped).toBe(true);
+    expect(out.restSkippedPending).toBeFalsy();
+    expect(isValidExposure(out.entries[0])).toBe(false);
+    const third = await logSet(s.id!, id, set(), T0 + 400_000);
+    expect(third.entries[0].sets[2].restSkipped).toBe(false);
+  });
+
+  it('a skip after the last set of an exercise invalidates nothing when moving on', async () => {
+    const s = await startNextSession(T0);
+    const a = s.entries[0].exerciseId;
+    const b = s.entries[1].exerciseId;
+    for (let i = 0; i < 3; i++) await logSet(s.id!, a, set(), T0 + i * 300_000);
+    await skipRest(s.id!, T0 + 1_000_000);
+    const out = await logSet(s.id!, b, set(), T0 + 1_010_000);
+    expect(out.restSkippedPending).toBeFalsy();
+    expect(out.entries.every((e) => e.sets.every((x) => !x.restSkipped))).toBe(true);
+    expect(isValidExposure(out.entries[0])).toBe(true);
+    expect(isValidExposure(out.entries[1])).toBe(true);
+  });
+
+  it('skip after the final set, then finish: pushdown 15/15/15 RIR 1 still progresses', async () => {
+    const s = await startNextSession(T0);
+    expect(s.slot).toBe('upperA');
+    const id = 'cablePushdown';
+    const w = 20;
+    for (let i = 0; i < 3; i++) {
+      await logSet(s.id!, id, set({ weight: w, fullReps: 15, rir: 1 }), T0 + i * 120_000);
+    }
+    await skipRest(s.id!, T0 + 250_000);
+    await finishSession(s.id!, T0 + 260_000);
+    const done = (await db.sessions.get(s.id!))!;
+    expect(done.restSkippedPending).toBeFalsy();
+    expect(done.entries.find((e) => e.exerciseId === id)!.sets.every((x) => !x.restSkipped)).toBe(true);
+    for (let i = 1; i <= 3; i++) await runSession(T0 + i * DAY);
+    const next = await startNextSession(T0 + 4 * DAY);
+    expect(next.slot).toBe('upperA');
+    const p = next.entries.find((e) => e.exerciseId === id)!.prescription;
+    const inc = (await db.exercises.get(id))!.increment;
+    expect(p.weight).toBe(w + inc);
   });
 
   it('records restTakenSec of the previous set on the next log', async () => {
