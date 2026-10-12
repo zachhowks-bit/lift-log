@@ -56,7 +56,8 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
 
   if (valid.length === 0) {
     why = "Same weight: last session didn't count (rest skipped / out of order)";
-  } else if (last.sets.every((s) => s.fullReps >= repMax && effectiveRir(s) >= 1)) {
+  } else if (last.sets.length >= last.prescription.sets
+    && last.sets.every((s) => s.fullReps >= repMax && effectiveRir(s) >= 1)) {
     weight = lastTop + ex.increment;
     increased = true;
     why = `+${fmt(ex.increment)} kg: hit ${last.sets.map((s) => s.fullReps).join('/')} last time`;
@@ -74,7 +75,9 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
   }
 
   if (ex.lower) {
-    const pains = last.sets.map((s) => s.kneePain).filter((x): x is number => x !== null);
+    // Safety reads the newest session with sets, whatever its validity or deload status.
+    const newest = history.find((e) => e.sets.length > 0) ?? last;
+    const pains = newest.sets.map((s) => s.kneePain).filter((x): x is number => x !== null);
     const maxPain = pains.length ? Math.max(...pains) : null;
     const action = kneeAction(maxPain);
     if (action === 'noIncrease' && increased) {

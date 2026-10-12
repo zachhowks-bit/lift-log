@@ -39,6 +39,13 @@ describe('nextPrescription', () => {
     expect(p.targetReps).toEqual([6, 6, 6]);
     expect(p.why).toBe('+2.5 kg: hit 10/10/10 last time');
   });
+  it('no increase when fewer sets were logged than prescribed', () => {
+    const e = entry(60, [10], [1]);
+    e.prescription.sets = 3;
+    const p = nextPrescription(bench, [e], ctx());
+    expect(p.weight).toBe(60);
+    expect(p.why).not.toMatch(/^\+/);
+  });
   it('no increase if a set hit repMax with RIR 0', () => {
     const p = nextPrescription(bench, [entry(60, [10, 10, 10], [1, 1, 0])], ctx());
     expect(p.weight).toBe(60);
@@ -111,6 +118,26 @@ describe('nextPrescription', () => {
       expect(p.suggestSwap).toBe(true);
       expect(p.why).toBe('−10% + try a swap: knee pain 6');
       expect(p.targetReps).toEqual([10, 10]);
+    });
+    it('reads pain from the newest entry even when it is invalid', () => {
+      const h = [
+        entry(100, [15, 15], [1, 1], { knee: 8, skip: true, repMin: 10 }),
+        entry(100, [15, 15], [1, 1], { knee: 0, repMin: 10 }),
+      ];
+      const p = nextPrescription(legPress, h, ctx({ sets: 2 }));
+      expect(p.weight).toBe(90);
+      expect(p.suggestSwap).toBe(true);
+      expect(p.why).toBe('−10% + try a swap: knee pain 8');
+    });
+    it('reads pain from the newest entry even when it is a deload', () => {
+      const h = [
+        entry(90, [10, 10], [3, 3], { knee: 6, deload: true, repMin: 10 }),
+        entry(100, [15, 15], [1, 1], { knee: 0, repMin: 10 }),
+      ];
+      const p = nextPrescription(legPress, h, ctx({ sets: 2 }));
+      expect(p.weight).toBe(90);
+      expect(p.suggestSwap).toBe(true);
+      expect(p.why).toBe('−10% + try a swap: knee pain 6');
     });
     it('non-lower exercises ignore knee pain', () => {
       const p = nextPrescription(bench, [entry(60, [10, 10, 10], [1, 1, 1], { knee: 8 })], ctx());
