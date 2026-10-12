@@ -33,10 +33,10 @@ export async function exportBackup(): Promise<{ filename: string; json: string }
   const pad = (n: number) => String(n).padStart(2, '0');
   const filename = `workout-backup-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.json`;
 
-  const payload = await db.transaction('rw', db.tables, async () => {
+  // Read-only: the backup is recorded (markBackedUp) only once the file was actually handed off.
+  const payload = await db.transaction('r', db.tables, async () => {
     const prev = await db.settings.get('main');
     const settings: Settings = { schemaVersion: SCHEMA_VERSION, ...prev, id: 'main', lastBackupAt: exportedAt };
-    await db.settings.put(settings);
     return {
       schemaVersion: SCHEMA_VERSION,
       exportedAt,
@@ -49,6 +49,14 @@ export async function exportBackup(): Promise<{ filename: string; json: string }
     };
   });
   return { filename, json: JSON.stringify(payload, null, 2) };
+}
+
+/** Records that a backup file was saved or shared at `now`. */
+export async function markBackedUp(now: number): Promise<void> {
+  await db.transaction('rw', db.settings, async () => {
+    const prev = await db.settings.get('main');
+    await db.settings.put({ schemaVersion: SCHEMA_VERSION, ...prev, id: 'main', lastBackupAt: now });
+  });
 }
 
 export async function importBackup(json: string): Promise<{ ok: true } | { ok: false; error: string }> {

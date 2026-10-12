@@ -1,9 +1,14 @@
 import { db } from '../db/db';
-import { exportBackup, importBackup } from '../db/backup';
+import { exportBackup, importBackup, markBackedUp as recordBackup } from '../db/backup';
 
-/** Builds the backup JSON and records the backup time. */
+/** Builds the backup JSON. Does not record a backup: call markBackedUp once the file was handed off. */
 export function createBackup(): Promise<{ filename: string; json: string }> {
   return exportBackup();
+}
+
+/** Records the backup time; call only after the share completed or the download was started. */
+export function markBackedUp(now: number): Promise<void> {
+  return recordBackup(now);
 }
 
 /** Validates and restores a backup; existing data is untouched when it fails. */

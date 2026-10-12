@@ -12,7 +12,16 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  delete (navigator as unknown as Record<string, unknown>).share;
+  delete (navigator as unknown as Record<string, unknown>).canShare;
 });
+
+const mockShare = (share: () => Promise<void>) => {
+  const fn = vi.fn(share);
+  Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+  Object.defineProperty(navigator, 'share', { configurable: true, value: fn });
+  return fn;
+};
 
 const pickFile = (content: string) => {
   const file = new File([content], 'backup.json', { type: 'application/json' });
@@ -31,6 +40,27 @@ describe('Settings', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('This file is not a valid backup.');
     expect(confirm).toHaveBeenCalledWith('This replaces all your data. Continue?');
     expect(await db.exercises.get('bench')).toBeTruthy();
+  });
+
+  it('cancelling the share sheet does not record a backup', async () => {
+    const share = mockShare(() => Promise.reject(new DOMException('cancelled', 'AbortError')));
+    render(<App initial="settings" />);
+    await screen.findByText('Never backed up');
+    fireEvent.click(screen.getByRole('button', { name: 'Export backup' }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Export backup' })).toHaveProperty('disabled', false));
+    expect(screen.getByText('Never backed up')).toBeTruthy();
+    expect((await db.settings.get('main'))?.lastBackupAt).toBeNull();
+  });
+
+  it('a completed share records the backup', async () => {
+    const share = mockShare(() => Promise.resolve());
+    render(<App initial="settings" />);
+    await screen.findByText('Never backed up');
+    fireEvent.click(screen.getByRole('button', { name: 'Export backup' }));
+    expect(await screen.findByText(/^Last backup: /)).toBeTruthy();
+    expect(share).toHaveBeenCalledTimes(1);
+    expect((await db.settings.get('main'))?.lastBackupAt).toBeTypeOf('number');
   });
 
   it('does nothing when the import is not confirmed', async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createBackup, lastBackupAt, restoreBackup } from '../../state/backup';
+import { createBackup, lastBackupAt, markBackedUp, restoreBackup } from '../../state/backup';
 import { errMsg } from '../labels';
 
 interface Props {
@@ -40,17 +40,26 @@ export default function BackupPanel({ onRestored, onError }: Props) {
     try {
       const { filename, json } = await createBackup();
       const file = new File([json], filename, { type: 'application/json' });
+      let handedOff = false;
       if (navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({ files: [file] });
+          handedOff = true;
         } catch (e) {
-          // Cancelling the share sheet is fine; anything else falls back to a download.
-          if (!(e instanceof DOMException && e.name === 'AbortError')) download(file);
+          // Cancelling the share sheet records nothing; any other share failure falls back to a download.
+          if (!(e instanceof DOMException && e.name === 'AbortError')) {
+            download(file);
+            handedOff = true;
+          }
         }
       } else {
         download(file);
+        handedOff = true;
       }
-      await refresh();
+      if (handedOff) {
+        await markBackedUp(Date.now());
+        await refresh();
+      }
     } catch (e) {
       onError(errMsg(e));
     } finally {

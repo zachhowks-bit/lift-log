@@ -47,7 +47,7 @@ describe('ensureSeeded', () => {
 });
 
 describe('exportBackup', () => {
-  it('names the file by local date and sets lastBackupAt', async () => {
+  it('names the file by local date and does not record a backup', async () => {
     await ensureSeeded();
     await db.sessions.add(session(1));
     const { filename, json } = await exportBackup();
@@ -62,7 +62,7 @@ describe('exportBackup', () => {
     expect(Array.isArray(p.programState)).toBe(false);
     expect(p.programState.id).toBe('main');
     expect(p.settings.lastBackupAt).toBe(p.exportedAt);
-    expect((await db.settings.get('main'))?.lastBackupAt).toBe(p.exportedAt);
+    expect((await db.settings.get('main'))?.lastBackupAt).toBeNull();
     expect(json).toContain('\n  "schemaVersion"');
   });
 });
