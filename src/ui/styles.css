@@ -34,6 +34,8 @@ h1, h2, h3, p { margin: 0; }
 
 .boot { padding: 40px 16px; color: var(--muted); text-align: center; }
 .boot-error { color: var(--warn); }
+.crash { justify-content: center; text-align: center; gap: 16px; }
+.crash-msg { font-size: 22px; font-weight: 700; }
 
 .app {
   min-height: 100vh;

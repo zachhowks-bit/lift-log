@@ -1,13 +1,16 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { unlockAudio } from './audio';
 import Toast, { type ToastMsg } from './components/Toast';
+import ErrorBoundary from './ErrorBoundary';
+import { lazyWithReload } from './lazyWithReload';
 import CheckIn from './screens/CheckIn';
 import Home from './screens/Home';
 import Settings from './screens/Settings';
 import Workout from './screens/Workout';
 
 // Recharts is large; load the Progress screen (and its charts) only when opened.
-const Progress = lazy(() => import('./screens/Progress'));
+// If the chunk is gone after an update, reload once to pick up the new build.
+const Progress = lazyWithReload(() => import('./screens/Progress'));
 
 export type Screen = 'home' | 'workout' | 'progress' | 'settings' | 'checkin';
 
@@ -17,7 +20,15 @@ const TABS: { id: Screen; label: string }[] = [
   { id: 'settings', label: 'Settings' },
 ];
 
-export default function App({ initial = 'home' }: { initial?: Screen }) {
+export default function App(props: { initial?: Screen }) {
+  return (
+    <ErrorBoundary>
+      <AppScreens {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function AppScreens({ initial = 'home' }: { initial?: Screen }) {
   const [screen, setScreen] = useState<Screen>(initial);
   const [toast, setToast] = useState<ToastMsg | null>(null);
 
