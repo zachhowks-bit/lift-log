@@ -6,7 +6,7 @@ import { EXERCISES } from '../data/library';
 import { SCHEMA_VERSION, type Session } from '../types';
 
 const session = (startedAt: number): Session => ({
-  slot: 'upperA', startedAt, finishedAt: startedAt + 1000, blockNumber: 1, weekInBlock: 1,
+  slot: 'pushA', startedAt, finishedAt: startedAt + 1000, blockNumber: 1, weekInBlock: 1,
   entries: [], restEndsAt: null,
 });
 
@@ -20,8 +20,8 @@ describe('ensureSeeded', () => {
   it('seeds an empty database', async () => {
     await ensureSeeded();
     expect(await db.exercises.count()).toBe(EXERCISES.length);
-    expect(await db.templates.count()).toBe(4);
-    expect((await db.templates.get('upperA'))?.ids.length).toBeGreaterThan(0);
+    expect(await db.templates.count()).toBe(6);
+    expect((await db.templates.get('pushA'))?.ids.length).toBeGreaterThan(0);
     expect((await db.programState.get('main'))?.blockNumber).toBe(1);
     expect(await db.settings.get('main')).toEqual({ id: 'main', lastBackupAt: null, schemaVersion: SCHEMA_VERSION });
   });
@@ -31,7 +31,7 @@ describe('ensureSeeded', () => {
     await db.programState.update('main', { blockNumber: 3 });
     await ensureSeeded();
     expect(await db.exercises.count()).toBe(EXERCISES.length);
-    expect(await db.templates.count()).toBe(4);
+    expect(await db.templates.count()).toBe(6);
     expect(await db.programState.count()).toBe(1);
     expect((await db.programState.get('main'))?.blockNumber).toBe(3);
   });
@@ -79,7 +79,7 @@ describe('importBackup', () => {
     expect(await importBackup(json)).toEqual({ ok: true });
     expect(await db.sessions.toArray()).toEqual(before);
     expect(await db.exercises.count()).toBe(EXERCISES.length);
-    expect(await db.templates.count()).toBe(4);
+    expect(await db.templates.count()).toBe(6);
     expect((await db.programState.get('main'))?.id).toBe('main');
   });
 
@@ -108,7 +108,7 @@ describe('importBackup', () => {
     await ensureSeeded();
     const p = JSON.parse((await exportBackup()).json);
     await expectRejected(JSON.stringify({ ...p, schemaVersion: 0 }), 'not a valid backup');
-    await expectRejected(JSON.stringify({ ...p, schemaVersion: '1' }), 'not a valid backup');
+    await expectRejected(JSON.stringify({ ...p, schemaVersion: '2' }), 'not a valid backup');
   });
 
   it('rejects a truncated export', async () => {
@@ -132,9 +132,9 @@ describe('importBackup', () => {
     await expectRejected(JSON.stringify({ ...p, settings: { ...p.settings, id: 'x' } }), 'not a valid backup');
     await expectRejected(JSON.stringify({ ...p, exercises: [{ id: 1, name: 'x' }] }), 'not a valid backup');
     await expectRejected(JSON.stringify({ ...p, templates: [{ slot: 'bogus', ids: [] }] }), 'not a valid backup');
-    await expectRejected(JSON.stringify({ ...p, templates: [{ slot: 'upperA', ids: [1] }] }), 'not a valid backup');
-    await expectRejected(JSON.stringify({ ...p, sessions: [{ slot: 'upperA', startedAt: 'x', entries: [] }] }), 'not a valid backup');
-    await expectRejected(JSON.stringify({ ...p, sessions: [{ slot: 'upperA', startedAt: 1 }] }), 'not a valid backup');
+    await expectRejected(JSON.stringify({ ...p, templates: [{ slot: 'pushA', ids: [1] }] }), 'not a valid backup');
+    await expectRejected(JSON.stringify({ ...p, sessions: [{ slot: 'pushA', startedAt: 'x', entries: [] }] }), 'not a valid backup');
+    await expectRejected(JSON.stringify({ ...p, sessions: [{ slot: 'pushA', startedAt: 1 }] }), 'not a valid backup');
   });
 
   it('rolls back when the transaction fails midway', async () => {

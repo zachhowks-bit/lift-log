@@ -15,9 +15,11 @@ describe('applyCheckIn', () => {
   });
   it('rarely + 70% raises upper targets by 2 and adds C set', () => {
     const r = run(ans({ recovery: 'rarely' }), 70);
-    expect(r.state.volumeTargets.chest).toBe(12);
-    expect(r.state.volumeTargets.quads).toBe(6);
-    expect(r.state.setsByExercise.inclineDbPress).toBe(4);
+    const base = initialProgramState().volumeTargets;
+    expect(r.state.volumeTargets.chest).toBe(base.chest + 2);
+    expect(r.state.volumeTargets.quads).toBe(base.quads);
+    expect(r.state.volumeTargets.abs).toBe(base.abs);
+    expect(r.state.setsByExercise.machineChestPress).toBe(4);
     expect(r.changes).toContain('More upper volume: +2 sets/muscle');
   });
   it('rarely but pct < 60: nothing', () => {
@@ -31,31 +33,32 @@ describe('applyCheckIn', () => {
     const s = initialProgramState(); s.volumeTargets.quads = 5;
     s.setsByExercise = { latPulldown: 4 };
     const r = run(ans({ recovery: 'often' }), 0, s);
-    expect(r.state.volumeTargets.chest).toBe(8);
+    expect(r.state.volumeTargets.chest).toBe(initialProgramState().volumeTargets.chest - 2);
     expect(r.state.volumeTargets.quads).toBe(4);
     expect(r.state.setsByExercise.latPulldown).toBe(3);
-    expect(r.state.setsByExercise.chestSupportedRow).toBe(2);
-    expect(r.state.setsByExercise.bench).toBeUndefined();
+    expect(r.state.setsByExercise.machineChestPress).toBe(2);
+    expect(r.state.setsByExercise.isoRow).toBe(2);
+    expect(r.state.setsByExercise.chestSupportedRow).toBeUndefined();
     expect(r.state.setsByExercise.legPress).toBeUndefined(); // already at floor 2
     expect(r.changes).toContain('Less volume: −2 sets/muscle (recovery)');
   });
   it('knee worse swaps knee-sensitive in lower slots and freezes ramp', () => {
     const r = run(ans({ knee: 'worse' }));
-    expect(r.templates.lowerA).not.toContain('legExtension');
-    expect(r.templates.lowerA).not.toContain('legPress');
+    expect(r.templates.legsA).not.toContain('legExtension');
+    expect(r.templates.legsA).not.toContain('legPress');
     expect(r.state.legRampFrozen).toBe(true);
     expect(r.changes.some(c => c.startsWith('Knee: swapped Leg extension'))).toBe(true);
-    for (const id of r.templates.lowerA) expect(EXERCISE_BY_ID[id].kneeSensitive).toBe(false);
+    for (const id of r.templates.legsA) expect(EXERCISE_BY_ID[id].kneeSensitive).toBe(false);
   });
-  it('swapIds bench -> dbBench in upperA', () => {
-    const r = run(ans({ swapIds: ['bench'] }));
-    expect(r.templates.upperA[0]).toBe('dbBench');
-    expect(r.changes).toContain('Swapped Barbell bench press → Dumbbell bench press');
+  it('swapIds machine chest press -> dbBench in pushA', () => {
+    const r = run(ans({ swapIds: ['machineChestPress'] }));
+    expect(r.templates.pushA[0]).toBe('dbBench');
+    expect(r.changes).toContain('Swapped Machine chest press → Dumbbell bench press');
   });
   it('swap skips alternatives already in template', () => {
-    const t = { ...TEMPLATES, upperA: ['bench', 'dbBench', ...TEMPLATES.upperA.slice(1)] };
-    const r = run(ans({ swapIds: ['bench'] }), 0, initialProgramState(), t);
-    expect(r.templates.upperA[0]).toBe('machineChestPress');
+    const t = { ...TEMPLATES, pushA: ['machineChestPress', 'dbBench', ...TEMPLATES.pushA.slice(1)] };
+    const r = run(ans({ swapIds: ['machineChestPress'] }), 0, initialProgramState(), t);
+    expect(r.templates.pushA[0]).toBe('bench');
   });
   it('motivation low swaps last 2 isolation exercises', () => {
     const r = run(ans({ motivation: 'low' }));

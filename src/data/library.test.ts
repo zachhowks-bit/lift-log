@@ -9,10 +9,18 @@ describe('library', () => {
     expect(Object.keys(EXERCISE_BY_ID)).toHaveLength(EXERCISES.length);
   });
   it('slots and names', () => {
-    expect(SLOT_ORDER).toEqual(['upperA', 'lowerA', 'upperB', 'lowerB']);
-    expect(SLOT_NAMES.lowerB).toBe('Lower B — Hamstrings & Glutes');
-    expect(TEMPLATES.upperA).toHaveLength(6);
-    expect(TEMPLATES.lowerA).toHaveLength(5);
+    expect(SLOT_ORDER).toEqual(['pushA', 'pullA', 'legsA', 'pushB', 'pullB', 'legsB']);
+    expect(SLOT_NAMES.legsB).toBe('Legs B — Hamstrings & Glutes');
+    expect(SLOT_NAMES.upperA).toBe('Upper A (old plan)');
+    expect(TEMPLATES.pushA).toHaveLength(6);
+    expect(TEMPLATES.legsA).toHaveLength(5);
+  });
+  it('push days only push, pull days only pull (abs allowed)', () => {
+    const PUSH = ['chest', 'frontDelt', 'sideDelt', 'triceps', 'abs'];
+    const PULL = ['lats', 'midBack', 'rearDelt', 'biceps', 'abs'];
+    for (const id of [...TEMPLATES.pushA, ...TEMPLATES.pushB]) expect(PUSH, id).toContain(EXERCISE_BY_ID[id].primary[0]);
+    for (const id of [...TEMPLATES.pullA, ...TEMPLATES.pullB]) expect(PULL, id).toContain(EXERCISE_BY_ID[id].primary[0]);
+    for (const id of [...TEMPLATES.legsA, ...TEMPLATES.legsB]) expect(EXERCISE_BY_ID[id].lower, id).toBe(true);
   });
   it('every template id exists', () => {
     for (const id of tmplIds) expect(EXERCISE_BY_ID[id], id).toBeDefined();
@@ -30,7 +38,7 @@ describe('library', () => {
   });
   it('kneeSensitive set is exact and lower-only', () => {
     const k = EXERCISES.filter(e => e.kneeSensitive).map(e => e.id).sort();
-    expect(k).toEqual(['gobletBoxSquat', 'hackSquat', 'legExtension', 'legPress']);
+    expect(k).toEqual(['gobletBoxSquat', 'hackSquat', 'horizontalLegPress', 'legExtension', 'legPress']);
     for (const e of EXERCISES) if (e.kneeSensitive) expect(e.lower).toBe(true);
   });
   it('kneeSensitive exercises have a safe alternative, listed first for legPress/legExtension', () => {
@@ -56,10 +64,12 @@ describe('library', () => {
   });
   it('initialProgramState', () => {
     const s = initialProgramState();
-    expect(Object.keys(s.volumeTargets)).toHaveLength(14);
-    expect(s.volumeTargets.chest).toBe(10);
-    expect(s.volumeTargets.quads).toBe(6);
-    expect(s.volumeTargets.lowerBack).toBe(10);
+    expect(Object.keys(s.volumeTargets)).toHaveLength(15);
+    // Targets = what one round of the default plan delivers (min 4, max 20).
+    expect(s.volumeTargets.chest).toBe(17);
+    expect(s.volumeTargets.quads).toBe(4);
+    expect(s.volumeTargets.abs).toBe(6);
+    for (const v of Object.values(s.volumeTargets)) { expect(v).toBeGreaterThanOrEqual(4); expect(v).toBeLessThanOrEqual(20); }
     expect(s).toMatchObject({ id: 'main', nextSlotIndex: 0, blockNumber: 1, sessionsInBlock: 0, setsByExercise: {}, legRampFrozen: false });
     expect(initialProgramState()).not.toBe(s);
   });

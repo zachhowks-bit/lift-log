@@ -15,8 +15,8 @@ afterEach(cleanup);
 describe('Home', () => {
   it('shows the next slot, block/week label and Start on a fresh install', async () => {
     render(<App />);
-    expect(await screen.findByText('Next: Upper A — Push')).toBeTruthy();
-    expect(screen.getByText('Block 1 · Week 1 · 3 reps left')).toBeTruthy();
+    expect(await screen.findByText('Next: Push A — Chest focus')).toBeTruthy();
+    expect(screen.getByText('Block 1 · Round 1 · 3 reps left')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Start' })).toBeTruthy();
     expect(screen.getByText('No workouts yet.')).toBeTruthy();
     expect(screen.queryByText('Knee pain rising — see a physio.')).toBeNull();
@@ -28,7 +28,7 @@ describe('Home', () => {
       pctProgressed: 0, changes: [],
     });
     const st = (await db.programState.get('main'))!;
-    await db.programState.put({ ...st, sessionsInBlock: 20 });
+    await db.programState.put({ ...st, sessionsInBlock: 30 });
     render(<App />);
     expect(await screen.findByText('Knee pain rising — see a physio.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start' })).toBeNull();
@@ -42,7 +42,7 @@ describe('Home', () => {
   it('still allows resuming an active session while the check-in is due', async () => {
     await startNextSession(Date.now());
     const st = (await db.programState.get('main'))!;
-    await db.programState.put({ ...st, sessionsInBlock: 20 });
+    await db.programState.put({ ...st, sessionsInBlock: 30 });
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: 'Resume' }));
     expect(await screen.findByRole('button', { name: 'Finish workout' })).toBeTruthy();

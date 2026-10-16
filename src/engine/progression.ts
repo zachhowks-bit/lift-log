@@ -1,12 +1,30 @@
 import type { Exercise, ExerciseEntry, Prescription } from '../types';
 import { roundTo } from './round';
-import { defaultsFor, effectiveRir } from './rules';
+import { defaultsFor, effectiveRir, workingOnly } from './rules';
 import { isDeloadWeek, targetRirLabel } from './block';
-import { breakFactor } from './breaks';
+import { breakAdjust } from './breaks';
 import { kneeAction } from './knee';
 import { isStalled, isValidExposure, topWeight } from './stall';
 
-export interface ProgressionCtx { week: number; daysSinceLast: number | null; sets: number }
+export interface ProgressionCtx {
+  week: number; daysSinceLast: number | null; sets: number;
+  /** Working-set weights already used on this exercise: the gym's real stack/plate steps. */
+  knownWeights?: number[];
+}
+
+const tenth = (n: number) => Math.round(n * 10) / 10;
+
+/** Next weight up: a known heavier weight within two increments, else last + increment. */
+function stepUp(last: number, inc: number, known: number[]): number {
+  const up = known.filter((w) => w > last + 1e-9 && w <= last + 2 * inc + 1e-9).sort((a, b) => a - b)[0];
+  return up ?? tenth(last + inc);
+}
+
+/** Scaled-down weight: the heaviest known weight in [85%, 100%] of target, else rounded to the increment. */
+function scaleTo(target: number, inc: number, known: number[]): number {
+  const hit = known.filter((w) => w <= target + 1e-9 && w >= target * 0.85).sort((a, b) => b - a)[0];
+  return hit ?? roundTo(target, inc);
+}
 
 const fmt = (n: number): string => String(Number(n.toFixed(4)));
 
@@ -37,7 +55,9 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
   };
   const rep = (n: number) => Array<number>(sets).fill(n);
 
-  const entries = history.filter((e) => !e.isDeload && e.sets.length > 0);
+  const working = history.map(workingOnly);
+  const entries = working.filter((e) => !e.isDeload && e.sets.length > 0);
+  const known = ctx.knownWeights ?? [];
   if (entries.length === 0) {
     return {
       ...base, weight: null, targetReps: rep(repMax), needsCalibration: true,
@@ -49,6 +69,7 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
   const last = valid[0] ?? entries[0];
   const lastTop = topWeight(last);
   let weight = lastTop;
+  let scale = 1;
   let targets = rep(repMin);
   let why: string;
   let suggestSwap = false;
@@ -58,12 +79,12 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
     why = "Same weight: last session didn't count (rest skipped / out of order)";
   } else if (last.sets.length >= last.prescription.sets
     && last.sets.every((s) => s.fullReps >= repMax && effectiveRir(s) >= 1)) {
-    weight = lastTop + ex.increment;
+    weight = stepUp(lastTop, ex.increment, known);
     increased = true;
-    why = `+${fmt(ex.increment)} kg: hit ${last.sets.map((s) => s.fullReps).join('/')} last time`;
+    why = `+${fmt(tenth(weight - lastTop))} kg: hit ${last.sets.map((s) => s.fullReps).join('/')} last time`;
   } else if (missedBottom(last, repMin)) {
     if (missedBottom(valid[1], repMin)) {
-      weight = lastTop * 0.925;
+      scale = 0.925;
       why = '−7.5%: missed bottom of range twice';
     } else {
       why = `Same weight: missed ${repMin} last time`;
@@ -76,7 +97,7 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
 
   if (ex.lower) {
     // Safety reads the newest session with sets, whatever its validity or deload status.
-    const newest = history.find((e) => e.sets.length > 0) ?? last;
+    const newest = working.find((e) => e.sets.length > 0) ?? last;
     const pains = newest.sets.map((s) => s.kneePain).filter((x): x is number => x !== null);
     const maxPain = pains.length ? Math.max(...pains) : null;
     const action = kneeAction(maxPain);
@@ -87,7 +108,9 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
       targets = p.targets;
       why = `Held: knee pain ${maxPain} last time`;
     } else if (action === 'reduceAndSwap') {
-      weight = lastTop * 0.9;
+      weight = lastTop;
+      increased = false;
+      scale = 0.9;
       targets = rep(repMin);
       suggestSwap = true;
       why = `−10% + try a swap: knee pain ${maxPain}`;
@@ -95,14 +118,21 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
   }
 
   let prefix = '';
-  const bf = breakFactor(ctx.daysSinceLast);
-  if (bf < 1) {
-    weight *= bf;
-    prefix = `${bf <= 0.8 ? '−20%' : '−10%'}: back after ${ctx.daysSinceLast} days. `;
+  const br = breakAdjust(ctx.daysSinceLast);
+  if (br.label) {
+    if (br.hold && increased) {
+      weight = lastTop;
+      increased = false;
+      const p = plusOneTargets(last, sets, repMax);
+      targets = p.targets;
+      why = `Same weight: aim ${p.n} reps on set ${p.k}`;
+    }
+    scale *= br.factor;
+    prefix = br.label;
   }
 
   if (deload) {
-    weight *= 0.9;
+    scale *= 0.9;
     targets = rep(repMin);
     why = 'Deload week: lighter, easy reps';
   }
@@ -114,7 +144,7 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
   }
 
   return {
-    ...base, weight: roundTo(weight, ex.increment), targetReps: targets, why,
+    ...base, weight: scale < 1 ? scaleTo(weight * scale, ex.increment, known) : weight, targetReps: targets, why,
     needsCalibration: false, suggestSwap,
   };
 }

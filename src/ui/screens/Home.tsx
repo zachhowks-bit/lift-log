@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
 import { getHomeInfo, type HomeInfo } from '../../state/home';
 import { startNextSession } from '../../state/session';
+import WorkoutRow from '../components/WorkoutRow';
 
 interface Props {
   onOpenWorkout: () => void;
   onOpenCheckIn: () => void;
+  onOpenDetail: (id: number) => void;
+  onOpenHistory: () => void;
   onError: (message: string) => void;
 }
 
-const fmtDate = (t: number) =>
-  new Date(t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export default function Home({ onOpenWorkout, onOpenCheckIn, onError }: Props) {
+export default function Home({ onOpenWorkout, onOpenCheckIn, onOpenDetail, onOpenHistory, onError }: Props) {
   const [info, setInfo] = useState<HomeInfo | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -52,7 +50,7 @@ export default function Home({ onOpenWorkout, onOpenCheckIn, onError }: Props) {
       )}
       <section className="hero">
         <h2 className="hero-slot">{resuming ? 'In progress' : 'Next'}: {info.slotName}</h2>
-        <p className="hero-block">Block {info.blockNumber} · Week {info.week} · {info.targetRir}</p>
+        <p className="hero-block">Block {info.blockNumber} · Round {info.week} · {info.targetRir}</p>
         {checkInFirst ? (
           <>
             <p className="hint">Block finished. Do the check-in to set up your next block.</p>
@@ -66,14 +64,16 @@ export default function Home({ onOpenWorkout, onOpenCheckIn, onError }: Props) {
           </button>
         )}
       </section>
-      <section className="last">
-        <h3 className="section-label">Last session</h3>
-        {info.lastSession ? (
-          <p className="last-line">
-            <span>{fmtDate(info.lastSession.date)} · {info.lastSession.slotName}</span>
-            <span className="last-stats">{plural(info.lastSession.sets, 'set')} · {plural(info.lastSession.exercises, 'exercise')}</span>
-          </p>
-        ) : <p className="hint">No workouts yet.</p>}
+      <section className="last" aria-labelledby="recent-h">
+        <h3 className="section-label" id="recent-h">Recent workouts</h3>
+        {info.recent.length === 0 ? <p className="hint">No workouts yet.</p> : (
+          <>
+            <ul className="wlist">
+              {info.recent.map((w) => <WorkoutRow key={w.id} w={w} onOpen={onOpenDetail} />)}
+            </ul>
+            <button type="button" className="btn-link" onClick={onOpenHistory}>See all workouts</button>
+          </>
+        )}
       </section>
     </main>
   );

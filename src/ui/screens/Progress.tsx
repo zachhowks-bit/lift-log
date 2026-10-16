@@ -5,6 +5,7 @@ import {
 import {
   currentWeekSets, exerciseHistory, kneeTrend, loggedExercises,
 } from '../../state/progress';
+import { highlights, type Highlights } from '../../state/history';
 import { errMsg, MUSCLE_LABELS, shortDate } from '../labels';
 import type { Muscle } from '../../types';
 
@@ -147,6 +148,119 @@ function WeeklySets({ rows }: { rows: { muscle: Muscle; done: number; target: nu
   );
 }
 
+const MAX_PLATES = 6;
+
+/** The 12-week strip: each week is a bar loaded with one plate per workout. */
+function WeekStrip({ h }: { h: Highlights }) {
+  const last = h.weeks[h.weeks.length - 1];
+  const headline = h.weekStreak >= 2 ? `${h.weekStreak} weeks in a row`
+    : h.weekStreak === 1 ? '1 solid week' : last.count >= 1 ? 'Building this week' : 'Start this week';
+  const sub = h.weekStreak >= 1
+    ? 'Weeks with 3 or more workouts. Keep the bar loaded.'
+    : `${Math.max(0, 3 - last.count)} more ${3 - last.count === 1 ? 'workout' : 'workouts'} this week to start a streak.`;
+  return (
+    <section className="streak" aria-labelledby="streak-h">
+      <h2 className="streak-title" id="streak-h">{headline}</h2>
+      <p className="streak-sub">{sub}</p>
+      <ol className="strip" aria-label="Workouts per week, last 12 weeks">
+        {h.weeks.map((w, i) => {
+          const now = i === h.weeks.length - 1;
+          const plates = Math.min(MAX_PLATES, w.count);
+          return (
+            <li key={w.start} className={`strip-wk${now ? ' strip-now' : ''}${w.count >= 3 ? ' strip-hit' : ''}`}
+              aria-label={`Week of ${shortDate(w.start)}: ${w.count} ${w.count === 1 ? 'workout' : 'workouts'}`}>
+              <span className="strip-bar" aria-hidden="true">
+                {Array.from({ length: plates }, (_, k) => <i key={k} className="plate" />)}
+              </span>
+              <span className="strip-n" aria-hidden="true">{w.count || ''}</span>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="strip-axis" aria-hidden="true">
+        <span>{shortDate(h.weeks[0].start)}</span><span>This week</span>
+      </div>
+    </section>
+  );
+}
+
+const pctChange = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+
+function ThisWeek({ h }: { h: Highlights }) {
+  const v = pctChange(h.thisWeek.volumeKg, h.lastWeek.volumeKg);
+  return (
+    <dl className="detail-stats">
+      <div><dt>This week</dt><dd>{h.thisWeek.workouts}</dd></div>
+      <div><dt>Sets</dt><dd>{h.thisWeek.sets}</dd></div>
+      <div>
+        <dt>Volume vs last wk</dt>
+        <dd className={v !== null && v > 0 ? 'up' : undefined}>{v === null ? '–' : `${v > 0 ? '+' : ''}${v}%`}</dd>
+      </div>
+    </dl>
+  );
+}
+
+function Sparkline({ values }: { values: number[] }) {
+  const W = 72;
+  const H = 24;
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const span = hi - lo || 1;
+  const pts = values.map((v, i) => [
+    values.length === 1 ? W / 2 : (i / (values.length - 1)) * (W - 4) + 2,
+    H - 3 - ((v - lo) / span) * (H - 6),
+  ]);
+  const [lx, ly] = pts[pts.length - 1];
+  return (
+    <svg className="spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+      <polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={lx} cy={ly} r="3" fill="currentColor" />
+    </svg>
+  );
+}
+
+function Records({ h }: { h: Highlights }) {
+  return (
+    <section className="panel" aria-labelledby="pr-h">
+      <h2 className="panel-title" id="pr-h">Personal records, last 30 days</h2>
+      {h.recentPRs.length === 0 ? (
+        <p className="hint">Lift more weight, or more reps at the same weight, than ever before on an exercise to set one.</p>
+      ) : (
+        <ul className="pr-list">
+          {h.recentPRs.slice(0, 5).map((p) => (
+            <li key={`${p.sessionId}-${p.exerciseId}`} className="pr-item">
+              <span className="pr-name">{p.name}</span>
+              <span className="pr-set">{p.setText}</span>
+              <span className="pr-delta">{shortDate(p.date)} · {p.kind === 'weight' ? `+${Number((p.value - p.previous).toFixed(1))} kg heaviest` : `est. max ${p.value} kg`}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function Gains({ h }: { h: Highlights }) {
+  if (h.gains.length === 0) return null;
+  return (
+    <section className="panel" aria-labelledby="gain-h">
+      <h2 className="panel-title" id="gain-h">Biggest gains</h2>
+      <p className="hint">Estimated 1-rep max, first workout to best since</p>
+      <ul className="gains">
+        {h.gains.map((g) => (
+          <li key={g.exerciseId} className="gain">
+            <span className="gain-name">{g.name}</span>
+            <span className="gain-pct">+{g.pct}%</span>
+            <span className="gain-range">{g.from} → {g.to} kg</span>
+            <Sparkline values={g.series} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** Progress (spec §6.4): per-exercise chart, weekly sets vs target, knee pain trend. */
 export default function Progress({ onError }: Props) {
   const [exercises, setExercises] = useState<{ id: string; name: string }[] | null>(null);
@@ -154,11 +268,13 @@ export default function Progress({ onError }: Props) {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [weekly, setWeekly] = useState<{ muscle: Muscle; done: number; target: number }[] | null>(null);
   const [knee, setKnee] = useState<{ date: number; max: number }[]>([]);
+  const [hl, setHl] = useState<Highlights | null>(null);
 
   useEffect(() => {
     let alive = true;
-    Promise.all([loggedExercises(), currentWeekSets(), kneeTrend()]).then(([ex, wk, kn]) => {
+    Promise.all([loggedExercises(), currentWeekSets(), kneeTrend(), highlights(Date.now())]).then(([ex, wk, kn, h]) => {
       if (!alive) return;
+      setHl(h);
       setExercises(ex);
       setPicked(ex[0]?.id ?? null);
       setWeekly(wk);
@@ -174,11 +290,15 @@ export default function Progress({ onError }: Props) {
     return () => { alive = false; };
   }, [picked, onError]);
 
-  if (!exercises || !weekly) return <main className="screen"><p className="hint">Loading…</p></main>;
+  if (!exercises || !weekly || !hl) return <main className="screen"><p className="hint">Loading…</p></main>;
 
   return (
     <main className="screen progress">
       <h1 className="app-title">Progress</h1>
+      <WeekStrip h={hl} />
+      <ThisWeek h={hl} />
+      <Records h={hl} />
+      <Gains h={hl} />
 
       <section className="panel" aria-labelledby="ex-h">
         <h2 className="panel-title" id="ex-h">Strength</h2>
@@ -193,8 +313,8 @@ export default function Progress({ onError }: Props) {
       </section>
 
       <section className="panel" aria-labelledby="wk-h">
-        <h2 className="panel-title" id="wk-h">Sets this week</h2>
-        <p className="hint">Hard sets done / target per muscle</p>
+        <h2 className="panel-title" id="wk-h">Sets this round</h2>
+        <p className="hint">Working sets done / target per muscle, across this round of 6 workouts</p>
         <WeeklySets rows={weekly} />
       </section>
 

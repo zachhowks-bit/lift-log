@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import { EXERCISES, TEMPLATES, SLOT_ORDER, initialProgramState } from '../data/library';
 import { SCHEMA_VERSION } from '../types';
 import type { CheckIn, Exercise, ProgramState, Session, Settings, SlotId } from '../types';
+import { migrateToV2 } from './migrate';
 
 export interface TemplateRow { slot: SlotId; ids: string[]; }
 
@@ -30,8 +31,11 @@ export const db = new LiftLogDB();
 
 /** Seed an empty database (idempotent) and ask the browser for persistent storage. */
 export async function ensureSeeded(): Promise<void> {
-  await db.transaction('rw', [db.exercises, db.templates, db.programState, db.settings], async () => {
-    if ((await db.programState.count()) > 0) return;
+  await db.transaction('rw', [db.exercises, db.templates, db.programState, db.settings, db.sessions], async () => {
+    if ((await db.programState.count()) > 0) {
+      await migrateToV2(db);
+      return;
+    }
     await db.exercises.bulkPut(EXERCISES);
     await db.templates.bulkPut(SLOT_ORDER.map((slot) => ({ slot, ids: [...TEMPLATES[slot]] })));
     await db.programState.put(initialProgramState());

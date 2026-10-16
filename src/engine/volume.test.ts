@@ -9,17 +9,22 @@ const entry = (id: string, n: number, isDeload = false): ExerciseEntry => ({
   prescription: { exerciseId: id, weight: 100, sets: n, repMin: 6, repMax: 10, targetReps: [], restSec: 180,
     targetRir: '2', why: '', needsCalibration: false, suggestSwap: false },
 });
-const session = (entries: ExerciseEntry[]): Session => ({ slot: 'upperA', startedAt: 0, finishedAt: 1, blockNumber: 1, weekInBlock: 1, entries, restEndsAt: null });
-const lowerIds = TEMPLATES.lowerA;
+const session = (entries: ExerciseEntry[]): Session => ({ slot: 'pushA', startedAt: 0, finishedAt: 1, blockNumber: 1, weekInBlock: 1, entries, restEndsAt: null });
+const lowerIds = TEMPLATES.legsA;
 
 describe('weeklySets', () => {
+  it('ignores warm-up and drop sets', () => {
+    const e = entry('bench', 3);
+    e.sets.push({ ...set(), kind: 'warmup' }, { ...set(), kind: 'drop' });
+    expect(weeklySets([session([e])], EXERCISE_BY_ID).chest).toBe(3);
+  });
   it('counts primary 1 and secondary 0.5', () => {
     const r = weeklySets([session([entry('bench', 3)]), session([entry('bench', 3)])], EXERCISE_BY_ID);
     expect(r.chest).toBe(6);
     expect(r.triceps).toBe(3);
     expect(r.frontDelt).toBe(3);
     expect(r.quads).toBe(0);
-    expect(Object.keys(r)).toHaveLength(14);
+    expect(Object.keys(r)).toHaveLength(15);
   });
   it('includes deload entries', () => {
     expect(weeklySets([session([entry('bench', 2, true)])], EXERCISE_BY_ID).chest).toBe(2);

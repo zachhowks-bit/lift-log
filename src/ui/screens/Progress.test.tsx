@@ -30,15 +30,15 @@ describe('Progress', () => {
 
   it('lists logged exercises and weekly sets done / target', async () => {
     const s = await startNextSession(T0);
-    await logSet(s.id!, 'bench', {
+    await logSet(s.id!, 'machineChestPress', {
       weight: 60, fullReps: 8, partialReps: 0, rir: 2, restTakenSec: null, restSkipped: false, kneePain: null,
     }, T0);
     await finishSession(s.id!, T0 + 1000);
     render(<App initial="progress" />);
     const select = await screen.findByRole('combobox', { name: 'Exercise' }, LOAD);
-    expect((select as HTMLSelectElement).value).toBe('bench');
+    expect((select as HTMLSelectElement).value).toBe('machineChestPress');
     expect(await screen.findByRole('cell', { name: '60 kg' })).toBeTruthy(); // table view of the chart
     expect(screen.getByRole('meter', { name: 'Chest sets' }).getAttribute('aria-valuenow')).toBe('1');
-    expect(screen.getByText('1 / 10')).toBeTruthy();
+    expect(screen.getByText('1 / 17')).toBeTruthy();
   });
 });

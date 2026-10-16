@@ -31,13 +31,13 @@ describe('exerciseHistory', () => {
 });
 
 describe('currentWeekSets', () => {
-  it('lists all 14 muscles with done and target', async () => {
+  it('lists all 15 muscles with done and target', async () => {
     const s = await startNextSession(T0);
     await logSet(s.id!, s.entries[0].exerciseId, set(), T0);
     const rows = await currentWeekSets();
-    expect(rows).toHaveLength(14);
+    expect(rows).toHaveLength(15);
     expect(rows.find((r) => r.muscle === 'chest')!.done).toBeGreaterThan(0);
-    expect(rows.find((r) => r.muscle === 'chest')!.target).toBe(10);
+    expect(rows.find((r) => r.muscle === 'chest')!.target).toBe(17);
     expect(rows.find((r) => r.muscle === 'calves')!.done).toBe(0);
   });
 });
@@ -76,13 +76,13 @@ describe('loggedExercises', () => {
   it('lists exercises with a set in a finished session, by name', async () => {
     expect(await loggedExercises()).toEqual([]);
     const s = await startNextSession(T0);
-    await logSet(s.id!, 'latPulldown', set(), T0);
-    await logSet(s.id!, 'bench', set(), T0 + 1);
+    await logSet(s.id!, 'machineChestPress', set(), T0);
+    await logSet(s.id!, 'chestFly', set(), T0 + 1);
     expect(await loggedExercises()).toEqual([]); // still in progress
     await finishSession(s.id!, T0 + 1000);
     expect(await loggedExercises()).toEqual([
-      { id: 'bench', name: 'Barbell bench press' },
-      { id: 'latPulldown', name: 'Lat pulldown' },
+      { id: 'chestFly', name: 'Chest fly (machine)' },
+      { id: 'machineChestPress', name: 'Machine chest press' },
     ]);
   });
 });

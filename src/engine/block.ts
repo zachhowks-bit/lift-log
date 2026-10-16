@@ -1,5 +1,10 @@
-export function weekInBlock(sessionsInBlock: number): 1 | 2 | 3 | 4 | 5 {
-  return Math.min(5, Math.floor(sessionsInBlock / 4) + 1) as 1 | 2 | 3 | 4 | 5;
+/** One round = every workout in the rotation once (Push A … Legs B). */
+export const SESSIONS_PER_ROUND = 6;
+/** A block is 5 rounds: 4 build rounds, then a deload round. */
+export const SESSIONS_PER_BLOCK = SESSIONS_PER_ROUND * 5;
+
+export function weekInBlock(sessionsInBlock: number, perRound = SESSIONS_PER_ROUND): 1 | 2 | 3 | 4 | 5 {
+  return Math.min(5, Math.floor(sessionsInBlock / perRound) + 1) as 1 | 2 | 3 | 4 | 5;
 }
 
 export function isDeloadWeek(week: number): boolean {

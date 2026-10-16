@@ -1,6 +1,6 @@
 import { db } from '../db/db';
 import { SLOT_NAMES, SLOT_ORDER } from '../data/library';
-import type { Exercise, ExType, Muscle, SlotId } from '../types';
+import type { Exercise, ExType, Muscle, SessionSlot, SlotId } from '../types';
 
 export async function getExercises(): Promise<Record<string, Exercise>> {
   const out: Record<string, Exercise> = {};
@@ -12,8 +12,8 @@ export async function getExercise(id: string): Promise<Exercise | null> {
   return (await db.exercises.get(id)) ?? null;
 }
 
-export function slotName(slot: SlotId): string {
-  return SLOT_NAMES[slot];
+export function slotName(slot: SessionSlot): string {
+  return SLOT_NAMES[slot] ?? slot;
 }
 
 export async function getTemplates(): Promise<Record<SlotId, string[]>> {

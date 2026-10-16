@@ -1,6 +1,7 @@
 import { db } from '../db/db';
 import { weekInBlock } from '../engine/block';
 import { kneeRising } from '../engine/knee';
+import { isWorking } from '../engine/rules';
 import { ALL_MUSCLES, weeklySets } from '../engine/volume';
 import type { Exercise, Muscle, Session } from '../types';
 
@@ -15,9 +16,10 @@ export async function exerciseHistory(id: string): Promise<{ date: number; topWe
   const out: { date: number; topWeight: number; e1rm: number }[] = [];
   for (const s of await finishedAsc()) {
     const e = s.entries.find((x) => x.exerciseId === id);
-    if (!e || e.sets.length === 0) continue;
-    const topWeight = Math.max(...e.sets.map((x) => x.weight));
-    const e1rm = Math.max(...e.sets.map((x) => x.weight * (1 + x.fullReps / 30)));
+    const work = e ? e.sets.filter(isWorking) : [];
+    if (work.length === 0) continue;
+    const topWeight = Math.max(...work.map((x) => x.weight));
+    const e1rm = Math.max(...work.map((x) => x.weight * (1 + x.fullReps / 30)));
     out.push({ date: s.startedAt, topWeight, e1rm: Math.round(e1rm * 10) / 10 });
   }
   return out;

@@ -13,7 +13,7 @@ function expectNoNaN(p: Prescription) {
   if (p.weight !== null) expect(Number.isFinite(p.weight)).toBe(true);
 }
 
-const ctx = (o: Partial<{ week: number; daysSinceLast: number | null; sets: number }> = {}) =>
+const ctx = (o: Partial<{ week: number; daysSinceLast: number | null; sets: number; knownWeights: number[] }> = {}) =>
   ({ week: 1, daysSinceLast: 3, sets: 3, ...o });
 
 describe('nextPrescription', () => {
@@ -146,12 +146,17 @@ describe('nextPrescription', () => {
   });
   it('break factors', () => {
     const h = [entry(60, [8, 8, 8], [1, 1, 1])];
-    const a = nextPrescription(bench, h, ctx({ daysSinceLast: 12 }));
+    const a = nextPrescription(bench, h, ctx({ daysSinceLast: 16 }));
     expect(a.weight).toBe(roundTo(54, 2.5));
-    expect(a.why).toBe('−10%: back after 12 days. Same weight: aim 9 reps on set 1');
+    expect(a.why).toBe('−10%: back after 16 days. Same weight: aim 9 reps on set 1');
     const b = nextPrescription(bench, h, ctx({ daysSinceLast: 25 }));
     expect(b.weight).toBe(roundTo(48, 2.5));
     expect(b.why.startsWith('−20%: back after 25 days. ')).toBe(true);
+  });
+  it('an 8-day trip keeps the weight and cancels an increase', () => {
+    const p = nextPrescription(bench, [entry(60, [10, 10, 10], [1, 1, 1])], ctx({ daysSinceLast: 8 }));
+    expect(p.weight).toBe(60);
+    expect(p.why).toBe('Back after 8 days: same weight, ease in. Same weight: aim 10 reps on set 1');
   });
   it('deload week halves sets and weight', () => {
     const p = nextPrescription(bench, [entry(60, [8, 8, 8], [1, 1, 1])], ctx({ week: 5 }));
@@ -160,8 +165,8 @@ describe('nextPrescription', () => {
     expect(p.targetReps).toEqual([6, 6]);
     expect(p.why).toBe('Deload week: lighter, easy reps');
     expect(p.targetRir).toBe('Deload: easy, 3+ left');
-    const q = nextPrescription(bench, [entry(60, [8, 8, 8], [1, 1, 1])], ctx({ week: 5, daysSinceLast: 12 }));
-    expect(q.why).toBe('−10%: back after 12 days. Deload week: lighter, easy reps');
+    const q = nextPrescription(bench, [entry(60, [8, 8, 8], [1, 1, 1])], ctx({ week: 5, daysSinceLast: 16 }));
+    expect(q.why).toBe('−10%: back after 16 days. Deload week: lighter, easy reps');
   });
   it('double miss with knee pain >= 6 gives last top x 0.9, not compounded', () => {
     const m = entry(100, [8, 9], [0, 1], { knee: 6, repMin: 10 });
@@ -189,5 +194,45 @@ describe('nextPrescription', () => {
       'suggestSwap', 'targetReps', 'targetRir', 'weight', 'why']);
     expect(p.targetReps).toHaveLength(p.sets);
     expectNoNaN(p);
+  });
+
+  describe('set kinds', () => {
+    it('drop sets do not count as missed reps', () => {
+      const e = entry(60, [10, 10, 10], [1, 1, 1]);
+      e.sets.push({ ...e.sets[0], weight: 45, fullReps: 4, rir: 0, kind: 'drop' });
+      const p = nextPrescription(bench, [e], ctx());
+      expect(p.weight).toBe(62.5);
+    });
+    it('warm-ups are ignored for top weight and calibration', () => {
+      const w = entry(30, [5], [3]);
+      w.sets[0].kind = 'warmup';
+      expect(nextPrescription(bench, [w], ctx()).needsCalibration).toBe(true);
+      const e = entry(60, [10, 10, 9], [1, 1, 1]);
+      e.sets.unshift({ ...e.sets[0], weight: 30, fullReps: 5, kind: 'warmup' });
+      expect(nextPrescription(bench, [e], ctx()).targetReps).toEqual([10, 10, 10]);
+    });
+  });
+
+  describe('gym weight stacks', () => {
+    const cable = { ...bench, id: 'pd', equipment: 'cable' as const, increment: 2.5 };
+    it('holds an off-grid weight exactly (20.3 stays 20.3)', () => {
+      const p = nextPrescription(cable, [entry(20.3, [9, 8, 8], [1, 1, 1])], ctx());
+      expect(p.weight).toBe(20.3);
+    });
+    it('increases to the next weight already used on that machine', () => {
+      const p = nextPrescription(cable, [entry(20.3, [10, 10, 10], [1, 1, 1])],
+        ctx({ knownWeights: [15.8, 20.3, 24.8] }));
+      expect(p.weight).toBe(24.8);
+      expect(p.why).toBe('+4.5 kg: hit 10/10/10 last time');
+    });
+    it('without a known next stack weight, adds the increment exactly', () => {
+      const p = nextPrescription(cable, [entry(20.3, [10, 10, 10], [1, 1, 1])], ctx());
+      expect(p.weight).toBe(22.8);
+    });
+    it('a cut lands on a known lower stack weight', () => {
+      const m = entry(63, [5, 5, 5], [0, 0, 0]);
+      const p = nextPrescription(cable, [m, m], ctx({ knownWeights: [45, 54, 63, 72] }));
+      expect(p.weight).toBe(54);
+    });
   });
 });

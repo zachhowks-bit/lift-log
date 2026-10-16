@@ -2,10 +2,10 @@ import type { CheckInAnswers, Exercise, Muscle, ProgramState, SlotId } from '../
 import { LEG_MUSCLES } from '../types';
 import { ALL_MUSCLES, MAX_TARGET, currentSets } from './volume';
 
-const SLOT_ORDER: SlotId[] = ['upperA', 'lowerA', 'upperB', 'lowerB'];
-const UPPER_SLOTS: SlotId[] = ['upperA', 'upperB'];
-const LOWER_SLOTS: SlotId[] = ['lowerA', 'lowerB'];
-const UPPER_MUSCLES: Muscle[] = ALL_MUSCLES.filter(m => !LEG_MUSCLES.includes(m));
+const SLOT_ORDER: SlotId[] = ['pushA', 'pullA', 'legsA', 'pushB', 'pullB', 'legsB'];
+const UPPER_SLOTS: SlotId[] = ['pushA', 'pullA', 'pushB', 'pullB'];
+const LOWER_SLOTS: SlotId[] = ['legsA', 'legsB'];
+const UPPER_MUSCLES: Muscle[] = ALL_MUSCLES.filter(m => !LEG_MUSCLES.includes(m) && m !== 'abs');
 
 type Templates = Record<SlotId, string[]>;
 
@@ -36,10 +36,7 @@ export function applyCheckIn(
   const volumeTargets = { ...state.volumeTargets };
   const setsByExercise = { ...state.setsByExercise };
   const next: ProgramState = { ...state, volumeTargets, setsByExercise };
-  const tpl: Templates = {
-    upperA: [...templates.upperA], lowerA: [...templates.lowerA],
-    upperB: [...templates.upperB], lowerB: [...templates.lowerB],
-  };
+  const tpl = Object.fromEntries(SLOT_ORDER.map((s) => [s, [...(templates[s] ?? [])]])) as Templates;
   const changes: string[] = [];
   const sets = (id: string) => currentSets(next, id, lib);
   const name = (id: string) => lib[id]?.name ?? id;

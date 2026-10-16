@@ -18,11 +18,12 @@ beforeEach(async () => {
 
 describe('swapOptions', () => {
   it('lists existing, non-avoid alternatives not already in the workout', async () => {
-    const s = await startNextSession(T0); // upperA: bench, inclineDbPress, ...
+    const s = await startNextSession(T0); // pushA: machineChestPress, inclineDbPress, chestFly, ...
     const dbBench = (await db.exercises.get('dbBench'))!;
     await db.exercises.put({ ...dbBench, avoid: true });
-    const ids = (await swapOptions(s, 'bench')).map((e) => e.id);
-    expect(ids).toEqual(['machineChestPress']); // dbBench avoided, inclineDbPress in session
+    const ids = (await swapOptions(s, 'chestFly')).map((e) => e.id);
+    expect(ids).toEqual(['cableFly']); // inclineDbPress is already in the session
+    expect((await swapOptions(s, 'machineChestPress')).map((e) => e.id)).toEqual(['bench', 'declinePress']); // dbBench avoided
     expect(await swapOptions(s, 'unknown')).toEqual([]);
   });
 });

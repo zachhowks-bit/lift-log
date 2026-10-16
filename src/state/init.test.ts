@@ -10,6 +10,6 @@ describe('initApp', () => {
     await initApp();
     await initApp();
     expect(await db.programState.count()).toBe(1);
-    expect(await db.templates.count()).toBe(4);
+    expect(await db.templates.count()).toBe(6);
   });
 });

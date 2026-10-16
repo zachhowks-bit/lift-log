@@ -89,11 +89,11 @@ describe('Settings', () => {
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
 
     fireEvent.click(screen.getByRole('button', { name: 'Move Incline dumbbell press up' }));
-    await waitFor(async () => expect((await db.templates.get('upperA'))!.ids.slice(0, 2)).toEqual(['inclineDbPress', 'bench']));
+    await waitFor(async () => expect((await db.templates.get('pushA'))!.ids.slice(0, 2)).toEqual(['inclineDbPress', 'machineChestPress']));
 
     const replace = await screen.findByRole('combobox', { name: 'Replace Cable triceps pushdown' });
     fireEvent.change(replace, { target: { value: 'dbKickback' } });
-    await waitFor(async () => expect((await db.templates.get('upperA'))!.ids).toContain('dbKickback'));
+    await waitFor(async () => expect((await db.templates.get('pushA'))!.ids).toContain('dbKickback'));
     expect(await screen.findByRole('combobox', { name: 'Replace Dumbbell triceps kickback' })).toBeTruthy();
     expect(screen.getByText('Changes apply from your next workout.')).toBeTruthy();
   });

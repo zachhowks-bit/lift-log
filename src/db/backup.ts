@@ -1,14 +1,15 @@
 import { db } from './db';
 import { SCHEMA_VERSION } from '../types';
 import type { Settings } from '../types';
-import { SLOT_ORDER } from '../data/library';
+import { LEGACY_SLOTS, SLOT_ORDER } from '../data/library';
+import { migrateToV2 } from './migrate';
 
 const NOT_VALID = 'This file is not a valid backup.';
 const TOO_NEW = 'This backup is from a newer version of Lift Log. Update the app first.';
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isSlot = (v: unknown) => typeof v === 'string' && (SLOT_ORDER as string[]).includes(v);
+const isSlot = (v: unknown) => typeof v === 'string' && ([...SLOT_ORDER, ...LEGACY_SLOTS] as string[]).includes(v);
 const rows = (v: unknown, ok: (r: Obj) => boolean) =>
   Array.isArray(v) && v.every((r) => isObj(r) && ok(r));
 
@@ -16,7 +17,7 @@ const rows = (v: unknown, ok: (r: Obj) => boolean) =>
 function validate(b: unknown): string | null {
   if (!isObj(b)) return NOT_VALID;
   if (typeof b.schemaVersion === 'number' && b.schemaVersion > SCHEMA_VERSION) return TOO_NEW;
-  if (b.schemaVersion !== SCHEMA_VERSION) return NOT_VALID;
+  if (b.schemaVersion !== 1 && b.schemaVersion !== SCHEMA_VERSION) return NOT_VALID;
   const good =
     rows(b.exercises, (r) => typeof r.id === 'string' && typeof r.name === 'string') &&
     rows(b.templates, (r) => isSlot(r.slot) && Array.isArray(r.ids) && r.ids.every((i) => typeof i === 'string')) &&
@@ -77,7 +78,8 @@ export async function importBackup(json: string): Promise<{ ok: true } | { ok: f
       await db.sessions.bulkPut(b.sessions as never[]);
       await db.checkIns.bulkPut(b.checkIns as never[]);
       await db.programState.put(b.programState as never);
-      await db.settings.put({ ...(b.settings as Obj), id: 'main', schemaVersion: SCHEMA_VERSION } as unknown as Settings);
+      await db.settings.put({ ...(b.settings as Obj), id: 'main', schemaVersion: b.schemaVersion } as unknown as Settings);
+      await migrateToV2(db);
     });
     return { ok: true };
   } catch {

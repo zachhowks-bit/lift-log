@@ -21,8 +21,8 @@ describe('getHomeInfo', () => {
   it('shows the first slot, week label and no banners on a fresh install', async () => {
     const i = await getHomeInfo(T0);
     expect(i).toMatchObject({
-      slot: 'upperA', slotName: 'Upper A — Push', blockNumber: 1, week: 1, targetRir: '3 reps left',
-      activeSessionId: null, lastSession: null, backupOverdue: false, kneeWarning: false, checkInDue: false,
+      slot: 'pushA', slotName: 'Push A — Chest focus', blockNumber: 1, week: 1, targetRir: '3 reps left',
+      activeSessionId: null, recent: [], backupOverdue: false, kneeWarning: false, checkInDue: false,
     });
   });
 
@@ -30,7 +30,7 @@ describe('getHomeInfo', () => {
     const s = await startNextSession(T0);
     const i = await getHomeInfo(T0 + 1000);
     expect(i.activeSessionId).toBe(s.id);
-    expect(i.slot).toBe('upperA');
+    expect(i.slot).toBe('pushA');
   });
 
   it('summarises the last finished session and moves to the next slot', async () => {
@@ -40,8 +40,9 @@ describe('getHomeInfo', () => {
     await logSet(s.id!, s.entries[1].exerciseId, set(), T0 + 3);
     await finishSession(s.id!, T0 + 3_600_000);
     const i = await getHomeInfo(T0 + DAY);
-    expect(i.slotName).toBe('Lower A — Quads & Glutes');
-    expect(i.lastSession).toEqual({ date: T0, slotName: 'Upper A — Push', sets: 3, exercises: 2 });
+    expect(i.slotName).toBe('Pull A — Lats focus');
+    expect(i.recent).toHaveLength(1);
+    expect(i.recent[0]).toMatchObject({ id: s.id, date: T0, slotName: 'Push A — Chest focus', sets: 3, exercises: 2, durationMin: 60 });
     expect(i.backupOverdue).toBe(true);
   });
 
@@ -51,7 +52,7 @@ describe('getHomeInfo', () => {
       pctProgressed: 0, changes: [],
     });
     const st = (await db.programState.get('main'))!;
-    await db.programState.put({ ...st, sessionsInBlock: 20 });
+    await db.programState.put({ ...st, sessionsInBlock: 30 });
     const i = await getHomeInfo(T0);
     expect(i.kneeWarning).toBe(true);
     expect(i.checkInDue).toBe(true);

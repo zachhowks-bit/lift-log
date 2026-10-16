@@ -15,6 +15,7 @@ export const MUSCLE_LABELS: Record<Muscle, string> = {
   gluteMed: 'Glute med',
   hamstrings: 'Hamstrings',
   calves: 'Calves',
+  abs: 'Abs',
 };
 
 export const TYPE_LABELS: Record<ExType, string> = { H: 'Heavy compound', C: 'Compound', I: 'Isolation' };

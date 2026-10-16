@@ -5,12 +5,16 @@ interface Props {
   remainingMs: number;
   nextLabel?: string;
   onSkip: () => void;
+  /** Shrink to a bar so a drop set can be logged or a set fixed; the rest keeps counting. */
+  onMinimize?: () => void;
+  minimized?: boolean;
+  onExpand?: () => void;
 }
 
 export const HOLD_MS = 600;
 
 /** Full-screen rest countdown. Render only while rest is running. */
-export default function RestTimer({ remainingMs, nextLabel, onSkip }: Props) {
+export default function RestTimer({ remainingMs, nextLabel, onSkip, onMinimize, minimized, onExpand }: Props) {
   const [holding, setHolding] = useState(false);
   const timer = useRef<number | null>(null);
 
@@ -32,6 +36,15 @@ export default function RestTimer({ remainingMs, nextLabel, onSkip }: Props) {
     if (timer.current !== null) window.clearTimeout(timer.current);
   }, []);
 
+  if (minimized) {
+    return (
+      <button type="button" className="rest-bar" onClick={onExpand} aria-label="Show rest timer">
+        <span>Resting</span>
+        <span className="rest-bar-clock" role="timer" aria-live="off">{formatClock(remainingMs)}</span>
+      </button>
+    );
+  }
+
   return (
     <div className="rest" role="dialog" aria-modal="true" aria-label="Rest timer">
       <p className="rest-label">Rest</p>
@@ -43,6 +56,9 @@ export default function RestTimer({ remainingMs, nextLabel, onSkip }: Props) {
         <span className="hold-fill" style={{ transitionDuration: holding ? `${HOLD_MS}ms` : '0ms' }} />
         <span className="hold-text">Hold to skip rest</span>
       </button>
+      {onMinimize && (
+        <button type="button" className="btn btn-ghost rest-min" onClick={onMinimize}>Log a drop set or fix a set</button>
+      )}
     </div>
   );
 }

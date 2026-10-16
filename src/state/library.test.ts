@@ -20,7 +20,8 @@ describe('library helpers', () => {
   });
 
   it('names slots', () => {
-    expect(slotName('upperB')).toBe('Upper B — Pull');
+    expect(slotName('pullB')).toBe('Pull B — Rows focus');
+    expect(slotName('upperB')).toBe('Upper B (old plan)');
   });
 });
 
@@ -69,10 +70,10 @@ describe('library editing', () => {
   });
 
   it('setTemplate replaces a slot and rejects unknown or duplicate ids', async () => {
-    await setTemplate('upperA', ['inclineDbPress', 'bench']);
-    expect((await getTemplates()).upperA).toEqual(['inclineDbPress', 'bench']);
-    await expect(setTemplate('upperA', ['bench', 'bench'])).rejects.toThrow('An exercise appears twice in this workout.');
-    await expect(setTemplate('upperA', ['nope'])).rejects.toThrow('Exercise not found.');
-    expect((await getTemplates()).upperA).toEqual(['inclineDbPress', 'bench']);
+    await setTemplate('pushA', ['inclineDbPress', 'bench']);
+    expect((await getTemplates()).pushA).toEqual(['inclineDbPress', 'bench']);
+    await expect(setTemplate('pushA', ['bench', 'bench'])).rejects.toThrow('An exercise appears twice in this workout.');
+    await expect(setTemplate('pushA', ['nope'])).rejects.toThrow('Exercise not found.');
+    expect((await getTemplates()).pushA).toEqual(['inclineDbPress', 'bench']);
   });
 });

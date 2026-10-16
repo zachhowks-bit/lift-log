@@ -229,3 +229,16 @@ volume targets), `settings` (lastBackupAt, schemaVersion).
 
 The app is not medical advice. Knee rules are conservative guards, and a physio's advice overrides them
 (owner can mark exercises `avoid`).
+
+## 11. v2 changes (2026-10-17, from the owner's first week of use and Hevy history)
+
+- **Split:** pure Push / Pull / Legs with A and B variations, rotating Push A → Pull A → Legs A → Push B → Pull B → Legs B. Push days hold only push exercises and pull days only pull (abs allowed). Exercises come from the owner's gym (Hevy log). A *round* = 6 workouts; a block = 5 rounds (30 workouts), the 5th a deload. Volume targets start at what one round of the plan delivers.
+- **Set types:** working (default), warm-up (W) and drop set (D). Only working sets drive progression, stalls, volume and PRs. Warm-up rest is 60 s. A drop set can be logged during rest (the timer shrinks to a bar).
+- **Machine stacks:** held weights stay exact (20.3 stays 20.3). An increase goes to the next weight already used on that exercise within two increments, else last + increment. Cuts land on a known weight within 85–100% of the target.
+- **Breaks (trips/events):** 7–13 days → same weights, no increase; 14–20 → −10%; 21+ → −20%.
+- **Editing:** any logged set (open or finished workout) can be edited or deleted; a finished workout can be deleted.
+- **History:** History tab (all workouts by month); Home shows the last 3; a summary with PRs after each workout.
+- **PRs:** heaviest working weight ever, else best estimated 1RM ever; an exercise's first workout is the baseline.
+- **Progress:** 12-week strip (one plate per workout; weeks with 3+ are a streak), this week vs last, PRs from the last 30 days, biggest gains with sparklines, then the existing charts.
+- **Swap:** "Use the new one in future workouts too" (on by default) updates the plan; "Other" adds a typed exercise for the same muscle.
+- **Data:** schema v2; phone data and v1 backups migrate automatically (history, avoid flags and custom exercises kept).

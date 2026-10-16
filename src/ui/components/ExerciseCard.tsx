@@ -1,4 +1,6 @@
+import { isWorking } from '../../engine/rules';
 import type { Exercise, ExerciseEntry, SetLog } from '../../types';
+import SetList from './SetList';
 import SetRow from './SetRow';
 
 interface Props {
@@ -10,6 +12,7 @@ interface Props {
   onToggle: () => void;
   onLog: (set: SetLog) => Promise<void>;
   onSwap: () => void;
+  onEditSet: (index: number) => void;
 }
 
 export function targetText(entry: ExerciseEntry): string {
@@ -18,22 +21,16 @@ export function targetText(entry: ExerciseEntry): string {
   return `${p.weight} kg × ${p.targetReps.join('/')}`;
 }
 
-function setText(s: SetLog): string {
-  let t = `${s.weight} kg × ${s.fullReps}`;
-  if (s.partialReps > 0) t += ` + ${s.partialReps}p`;
-  t += ` · ${s.rir >= 3 ? '3+' : s.rir} left`;
-  if (s.kneePain !== null) t += ` · knee ${s.kneePain}`;
-  if (s.restSkipped) t += ' · rest skipped';
-  return t;
-}
-
-export default function ExerciseCard({ entry, exercise, expanded, locked, defaultKnee, onToggle, onLog, onSwap }: Props) {
+export default function ExerciseCard({
+  entry, exercise, expanded, locked, defaultKnee, onToggle, onLog, onSwap, onEditSet,
+}: Props) {
   const p = entry.prescription;
-  const done = entry.sets.length;
+  const working = entry.sets.filter(isWorking);
+  const done = working.length;
   const complete = done >= p.sets;
   const name = exercise?.name ?? entry.exerciseId;
-  const last = entry.sets[done - 1];
-  const defaultWeight = last ? last.weight : p.weight;
+  const last = working[done - 1] ?? entry.sets[entry.sets.length - 1];
+  const defaultWeight = last && isWorking(last) ? last.weight : p.weight ?? last?.weight ?? null;
   const defaultReps = p.targetReps[done] ?? p.targetReps[p.targetReps.length - 1] ?? p.repMin;
   const calibrating = p.needsCalibration && done === 0;
   const hint = `First time: pick a weight you could do for ${p.repMax} with ~2 reps left`;
@@ -56,18 +53,14 @@ export default function ExerciseCard({ entry, exercise, expanded, locked, defaul
       {p.suggestSwap && done === 0 && <p className="swap-hint">Stalled or knee pain — consider a swap</p>}
       {expanded && (
         <div className="card-body">
-          {done > 0 && (
-            <ol className="done-sets">
-              {entry.sets.map((s, i) => <li key={i}><span className="done-n">{i + 1}</span>{setText(s)}</li>)}
-            </ol>
-          )}
+          {entry.sets.length > 0 && <SetList sets={entry.sets} onEdit={onEditSet} />}
           {complete && <p className="hint">All {p.sets} sets done. Log an extra set if you want.</p>}
           {exercise && (
-            <SetRow key={done} exercise={exercise} setNumber={done + 1} defaultWeight={defaultWeight}
+            <SetRow key={entry.sets.length} exercise={exercise} setNumber={done + 1} defaultWeight={defaultWeight}
               defaultReps={defaultReps} defaultKnee={defaultKnee} locked={locked} onLog={onLog}
               calibrationHint={calibrating ? hint : undefined} />
           )}
-          {done === 0 && (
+          {entry.sets.length === 0 && (
             <button type="button" className="btn btn-ghost" onClick={onSwap}>Swap exercise</button>
           )}
         </div>

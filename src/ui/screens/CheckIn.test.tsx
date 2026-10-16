@@ -9,7 +9,7 @@ beforeEach(async () => {
   await db.open();
   await ensureSeeded();
   const st = (await db.programState.get('main'))!;
-  await db.programState.put({ ...st, sessionsInBlock: 20 });
+  await db.programState.put({ ...st, sessionsInBlock: 30 });
 });
 afterEach(cleanup);
 
@@ -25,7 +25,7 @@ describe('CheckIn', () => {
 
     pick('Sore into the next session?', 'Often');
     pick('Knee compared with last block', 'Same');
-    fireEvent.click(await screen.findByRole('button', { name: 'Dumbbell curl' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Preacher curl (machine)' }));
     expect(submit).toHaveProperty('disabled', true);
     pick('Motivation', 'OK');
     expect(submit).toHaveProperty('disabled', false);
@@ -34,7 +34,7 @@ describe('CheckIn', () => {
     const list = await screen.findByRole('list', { name: 'Changes for next block' });
     const items = within(list).getAllByRole('listitem').map((li) => li.textContent);
     expect(items).toContain('Less volume: −2 sets/muscle (recovery)');
-    expect(items.some((t) => t?.startsWith('Swapped Dumbbell curl → '))).toBe(true);
+    expect(items.some((t) => t?.startsWith('Swapped Preacher curl (machine) → '))).toBe(true);
     expect((await db.programState.get('main'))!.blockNumber).toBe(2);
 
     fireEvent.click(screen.getByRole('button', { name: 'Start next block' }));

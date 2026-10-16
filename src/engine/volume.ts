@@ -1,8 +1,8 @@
 import type { Exercise, Muscle, ProgramState, Session } from '../types';
-import { defaultsFor } from './rules';
+import { defaultsFor, isWorking } from './rules';
 
 export const ALL_MUSCLES: Muscle[] = ['chest', 'frontDelt', 'sideDelt', 'rearDelt', 'triceps', 'biceps',
-  'lats', 'midBack', 'lowerBack', 'quads', 'glutes', 'gluteMed', 'hamstrings', 'calves'];
+  'lats', 'midBack', 'lowerBack', 'quads', 'glutes', 'gluteMed', 'hamstrings', 'calves', 'abs'];
 
 export const MAX_TARGET = 20;
 
@@ -17,7 +17,7 @@ export function weeklySets(sessions: Session[], lib: Record<string, Exercise>): 
     for (const e of s.entries) {
       const ex = lib[e.exerciseId];
       if (!ex) continue;
-      const n = e.sets.length;
+      const n = e.sets.filter(isWorking).length;
       for (const m of ex.primary) out[m] += n;
       for (const m of ex.secondary) out[m] += n * 0.5;
     }

@@ -1,17 +1,17 @@
 import { db } from '../db/db';
-import { SLOT_ORDER } from '../data/library';
+import { LEG_SLOTS, SLOT_ORDER } from '../data/library';
 import { nextPrescription } from '../engine/progression';
-import { defaultsFor, restFor } from '../engine/rules';
-import { isDeloadWeek, weekInBlock } from '../engine/block';
+import { defaultsFor, isWorking, restFor, workingOnly } from '../engine/rules';
+import { isDeloadWeek, SESSIONS_PER_BLOCK, SESSIONS_PER_ROUND, weekInBlock } from '../engine/block';
 import { isValidExposure } from '../engine/stall';
 import { rampLegSets } from '../engine/volume';
 import { applyCheckIn } from '../engine/checkin';
 import type {
-  CheckIn, CheckInAnswers, Exercise, ExerciseEntry, ProgramState, Session, SetLog, SlotId,
+  CheckIn, CheckInAnswers, Exercise, ExerciseEntry, ProgramState, Session, SetKind, SetLog, SlotId,
 } from '../types';
 
 const DAY_MS = 86_400_000;
-const SESSIONS_PER_BLOCK = 20;
+const isActiveSlot = (s: string): s is SlotId => (SLOT_ORDER as string[]).includes(s);
 
 type Lib = Record<string, Exercise>;
 
@@ -34,16 +34,19 @@ async function finishedSessionsNewestFirst(): Promise<Session[]> {
 
 function buildEntry(ex: Exercise, finished: Session[], state: ProgramState, week: number, now: number): ExerciseEntry {
   const history: ExerciseEntry[] = [];
+  const known = new Set<number>();
   for (const s of finished) {
     const e = s.entries.find((x) => x.exerciseId === ex.id);
-    if (e) history.push(e);
+    if (!e) continue;
+    history.push(e);
+    for (const x of e.sets) if (isWorking(x)) known.add(x.weight);
   }
   const last = finished[0];
   const daysSinceLast = last && last.finishedAt !== null
     ? Math.floor((now - last.finishedAt) / DAY_MS)
     : null;
   const prescription = nextPrescription(ex, history, {
-    week, daysSinceLast, sets: state.setsByExercise[ex.id] ?? defaultsFor(ex).sets,
+    week, daysSinceLast, sets: state.setsByExercise[ex.id] ?? defaultsFor(ex).sets, knownWeights: [...known],
   });
   return { exerciseId: ex.id, prescription, doneOutOfOrder: false, isDeload: isDeloadWeek(week), sets: [] };
 }
@@ -86,6 +89,7 @@ export function validateSet(s: Partial<SetLog>): string | null {
   }
   if (s.fullReps === 0 && s.partialReps === 0) return 'Log at least 1 rep (full or partial).';
   if (!isWhole(s.rir) || s.rir < 0 || s.rir > 5) return 'Reps left must be 0–5.';
+  if (s.kind !== undefined && s.kind !== 'warmup' && s.kind !== 'drop') return 'Unknown set type.';
   if (s.kneePain !== null && s.kneePain !== undefined && (!isWhole(s.kneePain) || s.kneePain < 0 || s.kneePain > 10)) {
     return 'Knee pain must be 0–10.';
   }
@@ -117,11 +121,15 @@ export async function logSet(sessionId: number, exerciseId: string, set: SetLog,
     }
 
     const entry = s.entries[idx];
-    if (entry.sets.length === 0 && s.entries.slice(0, idx).some((e) => e.sets.length === 0)) {
+    if (isWorking(set) && !entry.sets.some(isWorking)
+      && s.entries.slice(0, idx).some((e) => !e.sets.some(isWorking))) {
       entry.doneOutOfOrder = true;
     }
-    const skipped = !!s.restSkippedPending && exerciseId === s.lastLoggedExerciseId;
-    entry.sets.push({ ...set, restTakenSec: null, restSkipped: skipped });
+    // A drop set follows its set with no rest by design, so it never counts as skipping rest.
+    const skipped = !!s.restSkippedPending && exerciseId === s.lastLoggedExerciseId && set.kind !== 'drop';
+    const row: SetLog = { ...set, restTakenSec: null, restSkipped: skipped };
+    if (row.kind === undefined) delete row.kind;
+    entry.sets.push(row);
     s.restSkippedPending = false;
     const ex = lib[exerciseId];
     s.restEndsAt = now + (ex ? restFor(ex, set) : 0) * 1000;
@@ -149,8 +157,12 @@ export async function skipRest(sessionId: number, now: number): Promise<Session>
   });
 }
 
-export async function swapExercise(sessionId: number, fromId: string, toId: string): Promise<Session> {
-  return db.transaction('rw', [db.sessions, db.exercises, db.programState], async () => {
+/**
+ * Swap an exercise in the open workout. With `always`, the plan (template) for this workout
+ * uses the new exercise from now on too — e.g. the gym doesn't have that machine.
+ */
+export async function swapExercise(sessionId: number, fromId: string, toId: string, always = false): Promise<Session> {
+  return db.transaction('rw', [db.sessions, db.exercises, db.programState, db.templates], async () => {
     const s = await openSession(sessionId);
     const idx = s.entries.findIndex((e) => e.exerciseId === fromId);
     if (idx < 0) throw new Error('Exercise is not in this session.');
@@ -162,6 +174,14 @@ export async function swapExercise(sessionId: number, fromId: string, toId: stri
     const finished = await finishedSessionsNewestFirst();
     s.entries[idx] = buildEntry(to, finished, state, s.weekInBlock, s.startedAt);
     await db.sessions.put(s);
+    if (always && isActiveSlot(s.slot)) {
+      const tpl = await db.templates.get(s.slot);
+      if (tpl) {
+        const ids = tpl.ids.includes(toId) ? tpl.ids.filter((id) => id !== fromId)
+          : tpl.ids.map((id) => (id === fromId ? toId : id));
+        await db.templates.put({ slot: s.slot, ids });
+      }
+    }
     return s;
   });
 }
@@ -181,7 +201,7 @@ export async function finishSession(sessionId: number, now: number): Promise<{ c
       sessionsInBlock: state.sessionsInBlock + 1,
     };
 
-    if (state.sessionsInBlock % 4 === 0 && weekInBlock(state.sessionsInBlock - 1) < 5 && !state.legRampFrozen) {
+    if (state.sessionsInBlock % SESSIONS_PER_ROUND === 0 && weekInBlock(state.sessionsInBlock - 1) < 5 && !state.legRampFrozen) {
       const lib = await loadLib();
       const pains: number[] = [];
       for (const f of await finishedSessionsNewestFirst()) {
@@ -190,7 +210,7 @@ export async function finishSession(sessionId: number, now: number): Promise<{ c
       }
       const weekKneeMax = pains.length ? Math.max(...pains) : null;
       const lowerIds: string[] = [];
-      for (const slot of ['lowerA', 'lowerB'] as SlotId[]) {
+      for (const slot of LEG_SLOTS) {
         for (const id of (await db.templates.get(slot))?.ids ?? []) {
           if (!lowerIds.includes(id)) lowerIds.push(id);
         }
@@ -211,7 +231,8 @@ export async function blockProgressPct(): Promise<number> {
   const finished = (await finishedSessionsNewestFirst()).filter((s) => s.blockNumber === state.blockNumber).reverse();
   const byEx = new Map<string, ExerciseEntry[]>();
   for (const s of finished) {
-    for (const e of s.entries) {
+    for (const raw of s.entries) {
+      const e = workingOnly(raw);
       if (e.isDeload || e.sets.length === 0 || !isValidExposure(e)) continue;
       byEx.set(e.exerciseId, [...(byEx.get(e.exerciseId) ?? []), e]);
     }
@@ -247,5 +268,68 @@ export async function submitCheckIn(answers: CheckInAnswers, now = Date.now()): 
     const row: CheckIn = { ...answers, blockNumber: state.blockNumber, at: now, pctProgressed: pct, changes: res.changes };
     await db.checkIns.add(row);
     return res.changes;
+  });
+}
+
+// ---- Editing (open or finished workouts)
+
+async function anySession(sessionId: number): Promise<Session> {
+  const s = await db.sessions.get(sessionId);
+  if (!s) throw new Error('Workout not found.');
+  return s;
+}
+
+function entryOf(s: Session, exerciseId: string): ExerciseEntry {
+  const e = s.entries.find((x) => x.exerciseId === exerciseId);
+  if (!e) throw new Error('Exercise is not in this workout.');
+  return e;
+}
+
+/** Fix a logged set (weight, reps, reps left, knee, type). Rest timing and the timer are left alone. */
+export async function editSet(
+  sessionId: number, exerciseId: string, index: number,
+  changes: Pick<SetLog, 'weight' | 'fullReps' | 'partialReps' | 'rir' | 'kneePain'> & { kind?: SetKind },
+): Promise<Session> {
+  return db.transaction('rw', db.sessions, async () => {
+    const s = await anySession(sessionId);
+    const e = entryOf(s, exerciseId);
+    const cur = e.sets[index];
+    if (!cur) throw new Error('Set not found.');
+    const next: SetLog = { ...cur, ...changes };
+    if (next.kind === undefined) delete next.kind;
+    const err = validateSet(next);
+    if (err) throw new Error(err);
+    e.sets[index] = next;
+    await db.sessions.put(s);
+    return s;
+  });
+}
+
+/** Remove one logged set. */
+export async function deleteSet(sessionId: number, exerciseId: string, index: number): Promise<Session> {
+  return db.transaction('rw', db.sessions, async () => {
+    const s = await anySession(sessionId);
+    const e = entryOf(s, exerciseId);
+    if (!e.sets[index]) throw new Error('Set not found.');
+    e.sets.splice(index, 1);
+    await db.sessions.put(s);
+    return s;
+  });
+}
+
+/** Delete a finished workout from history. The rotation and block position are not changed. */
+export async function deleteWorkout(sessionId: number): Promise<void> {
+  await db.transaction('rw', db.sessions, async () => {
+    const s = await anySession(sessionId);
+    if (s.finishedAt === null) throw new Error('Finish or discard the open workout instead.');
+    await db.sessions.delete(sessionId);
+  });
+}
+
+/** Throw away the open workout (nothing is saved, the rotation doesn't move). */
+export async function discardWorkout(sessionId: number): Promise<void> {
+  await db.transaction('rw', db.sessions, async () => {
+    const s = await openSession(sessionId);
+    await db.sessions.delete(s.id!);
   });
 }
