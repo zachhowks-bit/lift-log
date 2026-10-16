@@ -1,7 +1,7 @@
 import { db } from './db';
 import { SCHEMA_VERSION } from '../types';
 import type { Settings } from '../types';
-import { LEGACY_SLOTS, SLOT_ORDER } from '../data/library';
+import { IMPORTED_SLOTS, LEGACY_SLOTS, SLOT_ORDER } from '../data/library';
 import { migrateToV2 } from './migrate';
 
 const NOT_VALID = 'This file is not a valid backup.';
@@ -9,7 +9,7 @@ const TOO_NEW = 'This backup is from a newer version of Lift Log. Update the app
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isSlot = (v: unknown) => typeof v === 'string' && ([...SLOT_ORDER, ...LEGACY_SLOTS] as string[]).includes(v);
+const isSlot = (v: unknown) => typeof v === 'string' && ([...SLOT_ORDER, ...LEGACY_SLOTS, ...IMPORTED_SLOTS] as string[]).includes(v);
 const rows = (v: unknown, ok: (r: Obj) => boolean) =>
   Array.isArray(v) && v.every((r) => isObj(r) && ok(r));
 

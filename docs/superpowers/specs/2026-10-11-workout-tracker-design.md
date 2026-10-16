@@ -242,3 +242,11 @@ The app is not medical advice. Knee rules are conservative guards, and a physio'
 - **Progress:** 12-week strip (one plate per workout; weeks with 3+ are a streak), this week vs last, PRs from the last 30 days, biggest gains with sparklines, then the existing charts.
 - **Swap:** "Use the new one in future workouts too" (on by default) updates the plan; "Other" adds a typed exercise for the same muscle.
 - **Data:** schema v2; phone data and v1 backups migrate automatically (history, avoid flags and custom exercises kept).
+
+## 12. v2.1 (2026-10-17, from analysing 11 Hevy workouts, 21 Sep – 16 Oct)
+
+- **Add workouts from a file** (Settings → Backup → Past workouts): adds finished workouts from a `lift-log-import` JSON file next to existing data (never replaces; same start time = skipped). Imported sessions use slots `push`/`pull`/`legs`, block 0, so they feed progression and PRs but not the current block. Hevy has no reps-left, so a set marked F or 3+ reps under range = 0 left, else 1. The owner's Hevy history file is kept out of this public repo.
+- **Bodyweight:** 0 kg is a valid weight. A 0 kg exercise never gets weight added; at the top of the range the note says to slow the reps or hold a plate.
+- **Reps falling off:** if set 3 at the same weight has 40%+ fewer reps than set 1 (Hevy history: 9 of 29 exercises), the next note adds "rest the full timer and stop 1–2 reps short on set 1".
+- **Warm-up hint:** before anything is logged in a workout, a compound's card suggests ~50% × 8 then ~75% × 4 (warm-ups were skipped in 5 of 11 Hevy workouts, incl. a cold 100 kg first set).
+- **Library:** adds Preacher curl (barbell); new library exercises are added to existing phones on start.

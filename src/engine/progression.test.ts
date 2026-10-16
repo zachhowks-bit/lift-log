@@ -235,4 +235,28 @@ describe('nextPrescription', () => {
       expect(p.weight).toBe(54);
     });
   });
+
+  describe('bodyweight', () => {
+    const crunch = { ...dbCurl, id: 'crunch', equipment: 'bodyweight' as const, increment: 2.5 };
+    it('never adds weight to a 0 kg exercise; reps drive it', () => {
+      const p = nextPrescription(crunch, [entry(0, [15, 15, 15], [1, 1, 1], { repMin: 10 })], ctx());
+      expect(p.weight).toBe(0);
+      expect(p.why).toBe('Top of the range at bodyweight: slow the reps down or hold a light plate');
+    });
+    it('a long break or deload keeps 0 kg at 0', () => {
+      expect(nextPrescription(crunch, [entry(0, [12, 12, 12], [1, 1, 1])], ctx({ daysSinceLast: 30 })).weight).toBe(0);
+      expect(nextPrescription(crunch, [entry(0, [12, 12, 12], [1, 1, 1])], ctx({ week: 5 })).weight).toBe(0);
+    });
+  });
+
+  describe('reps falling off', () => {
+    it('flags a big drop from set 1 to set 3 at the same weight', () => {
+      const p = nextPrescription(bench, [entry(60, [9, 8, 3], [1, 1, 1])], ctx());
+      expect(p.why).toMatch(/Reps fell 9 → 3 last time: rest the full timer and stop 1–2 reps short on set 1\.$/);
+    });
+    it('stays quiet when reps hold up', () => {
+      const p = nextPrescription(bench, [entry(60, [9, 8, 7], [1, 1, 1])], ctx());
+      expect(p.why).not.toMatch(/Reps fell/);
+    });
+  });
 });

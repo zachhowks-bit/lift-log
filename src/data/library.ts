@@ -1,4 +1,4 @@
-import type { Exercise, ExType, LegacySlotId, Muscle, ProgramState, SessionSlot, SlotId } from '../types';
+import type { Exercise, ExType, ImportedSlotId, LegacySlotId, Muscle, ProgramState, SessionSlot, SlotId } from '../types';
 
 type Equip = Exercise['equipment'];
 const ALL_MUSCLES: Muscle[] = ['chest', 'frontDelt', 'sideDelt', 'rearDelt', 'triceps', 'biceps',
@@ -79,6 +79,7 @@ export const EXERCISES: Exercise[] = [
   ex('straightArmPulldown', 'Straight-arm rope pulldown', 'I', ['lats'], [], 'cable', ['neutralGripPulldown', 'latPulldown']),
   ex('preacherCurl', 'Preacher curl (machine)', 'I', ['biceps'], [], 'machine', ['barbellCurl', 'cableCurl', 'dbCurl']),
   ex('barbellCurl', 'Barbell curl', 'I', ['biceps'], [], 'barbell', ['preacherCurl', 'cableCurl']),
+  ex('preacherCurlBarbell', 'Preacher curl (barbell)', 'I', ['biceps'], [], 'barbell', ['preacherCurl', 'barbellCurl']),
   ex('isoRow', 'Iso-lateral row (machine)', 'C', ['midBack'], ['lats', 'rearDelt'], 'machine', ['chestSupportedRow', 'machineRow', 'wideCableRow']),
   ex('isoLowRow', 'Iso-lateral low row', 'C', ['lats'], ['midBack'], 'machine', ['neutralGripPulldown', 'latPulldown']),
   ex('wideCableRow', 'Seated cable row (wide grip)', 'C', ['midBack'], ['rearDelt', 'lats'], 'cable', ['seatedCableRow', 'isoRow']),
@@ -106,16 +107,22 @@ export const SLOT_NAMES: Record<SessionSlot, string> = {
   lowerA: 'Lower A (old plan)',
   upperB: 'Upper B (old plan)',
   lowerB: 'Lower B (old plan)',
+  // brought in from Hevy
+  push: 'Push (from Hevy)',
+  pull: 'Pull (from Hevy)',
+  legs: 'Legs (from Hevy)',
 };
 
 /** Short label for chips and lists. */
 export const SLOT_SHORT: Record<SessionSlot, string> = {
   pushA: 'Push A', pullA: 'Pull A', legsA: 'Legs A', pushB: 'Push B', pullB: 'Pull B', legsB: 'Legs B',
   upperA: 'Upper A', lowerA: 'Lower A', upperB: 'Upper B', lowerB: 'Lower B',
+  push: 'Push', pull: 'Pull', legs: 'Legs',
 };
 
 export const LEGACY_SLOTS: LegacySlotId[] = ['upperA', 'lowerA', 'upperB', 'lowerB'];
 export const LEG_SLOTS: SlotId[] = ['legsA', 'legsB'];
+export const IMPORTED_SLOTS: ImportedSlotId[] = ['push', 'pull', 'legs'];
 
 export const TEMPLATES: Record<SlotId, string[]> = {
   pushA: ['machineChestPress', 'inclineDbPress', 'chestFly', 'dbLateralRaise', 'cablePushdown', 'cableCrunch'],

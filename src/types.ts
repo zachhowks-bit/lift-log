@@ -7,7 +7,9 @@ export const LEG_MUSCLES: Muscle[] = ['quads', 'glutes', 'gluteMed', 'hamstrings
 export type SlotId = 'pushA' | 'pullA' | 'legsA' | 'pushB' | 'pullB' | 'legsB';
 /** Slots from the first version (Upper/Lower). Old sessions keep them so history still reads correctly. */
 export type LegacySlotId = 'upperA' | 'lowerA' | 'upperB' | 'lowerB';
-export type SessionSlot = SlotId | LegacySlotId;
+/** Workouts brought in from another app (e.g. Hevy), labelled by day type. */
+export type ImportedSlotId = 'push' | 'pull' | 'legs';
+export type SessionSlot = SlotId | LegacySlotId | ImportedSlotId;
 
 export interface Exercise { id: string; name: string; type: ExType; primary: Muscle[]; secondary: Muscle[];
   equipment: 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight'; increment: number;

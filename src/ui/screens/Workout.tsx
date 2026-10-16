@@ -174,7 +174,8 @@ export default function Workout({ onExit, onFinished, onError }: Props) {
           expanded={expanded === entry.exerciseId} locked={resting} defaultKnee={knee}
           onToggle={() => setExpanded((cur) => (cur === entry.exerciseId ? null : entry.exerciseId))}
           onLog={(set) => log(entry.exerciseId, set)} onSwap={() => void openSwap(entry.exerciseId)}
-          onEditSet={(index) => setEditing({ exerciseId: entry.exerciseId, index })} />
+          onEditSet={(index) => setEditing({ exerciseId: entry.exerciseId, index })}
+          firstOfWorkout={session.entries.every((e) => e.sets.length === 0)} />
       ))}
       <button type="button" className="btn btn-finish" disabled={finishing} onClick={() => void finish()}>
         Finish workout

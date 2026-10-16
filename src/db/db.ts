@@ -34,6 +34,10 @@ export async function ensureSeeded(): Promise<void> {
   await db.transaction('rw', [db.exercises, db.templates, db.programState, db.settings, db.sessions], async () => {
     if ((await db.programState.count()) > 0) {
       await migrateToV2(db);
+      // New library exercises from app updates; the owner's own edits are never overwritten.
+      const have = new Set((await db.exercises.toArray()).map((e) => e.id));
+      const missing = EXERCISES.filter((e) => !have.has(e.id));
+      if (missing.length) await db.exercises.bulkAdd(missing);
       return;
     }
     await db.exercises.bulkPut(EXERCISES);

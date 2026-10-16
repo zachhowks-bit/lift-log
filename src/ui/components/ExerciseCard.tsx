@@ -13,16 +13,25 @@ interface Props {
   onLog: (set: SetLog) => Promise<void>;
   onSwap: () => void;
   onEditSet: (index: number) => void;
+  /** Nothing logged yet in this workout: suggest warm-up sets on a compound. */
+  firstOfWorkout?: boolean;
+}
+
+const near = (w: number, inc: number) => Math.max(inc, Math.round(w / inc) * inc);
+
+/** Two ramp-up sets before the first heavy exercise: ~50% × 8, then ~75% × 4. */
+export function warmupText(weight: number, inc: number): string {
+  return `Warm up first: ${near(weight * 0.5, inc)} kg × 8, then ${near(weight * 0.75, inc)} kg × 4. Log them as Warm-up.`;
 }
 
 export function targetText(entry: ExerciseEntry): string {
   const p = entry.prescription;
   if (p.needsCalibration || p.weight === null) return 'Pick a weight';
-  return `${p.weight} kg × ${p.targetReps.join('/')}`;
+  return `${p.weight === 0 ? 'Bodyweight' : `${p.weight} kg`} × ${p.targetReps.join('/')}`;
 }
 
 export default function ExerciseCard({
-  entry, exercise, expanded, locked, defaultKnee, onToggle, onLog, onSwap, onEditSet,
+  entry, exercise, expanded, locked, defaultKnee, onToggle, onLog, onSwap, onEditSet, firstOfWorkout,
 }: Props) {
   const p = entry.prescription;
   const working = entry.sets.filter(isWorking);
@@ -53,6 +62,9 @@ export default function ExerciseCard({
       {p.suggestSwap && done === 0 && <p className="swap-hint">Stalled or knee pain — consider a swap</p>}
       {expanded && (
         <div className="card-body">
+          {firstOfWorkout && exercise && exercise.type !== 'I' && p.weight !== null && p.weight >= 20 && (
+            <p className="warmup-hint">{warmupText(p.weight, exercise.increment)}</p>
+          )}
           {entry.sets.length > 0 && <SetList sets={entry.sets} onEdit={onEditSet} />}
           {complete && <p className="hint">All {p.sets} sets done. Log an extra set if you want.</p>}
           {exercise && (

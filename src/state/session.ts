@@ -83,7 +83,7 @@ const isWhole = (n: unknown): n is number => typeof n === 'number' && Number.isI
 
 export function validateSet(s: Partial<SetLog>): string | null {
   const w = s.weight;
-  if (typeof w !== 'number' || !Number.isFinite(w) || w <= 0) return 'Enter a weight above 0.';
+  if (typeof w !== 'number' || !Number.isFinite(w) || w < 0) return 'Enter a weight (0 for bodyweight).';
   if (!isWhole(s.fullReps) || !isWhole(s.partialReps) || s.fullReps < 0 || s.partialReps < 0) {
     return 'Reps must be whole numbers, 0 or more.';
   }

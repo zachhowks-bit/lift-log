@@ -44,6 +44,16 @@ function plusOneTargets(last: ExerciseEntry, sets: number, repMax: number): { ta
   return { targets, n, k: k + 1 };
 }
 
+/**
+ * Set 1 → set 3 reps at the same weight fell by 40% or more (e.g. 9 → 3): usually too little rest
+ * or set 1 taken to failure. Returns [first, third] reps, or null.
+ */
+export function repFall(e: ExerciseEntry): [number, number] | null {
+  const s = e.sets;
+  if (s.length < 3 || s[0].weight !== s[2].weight || s[0].fullReps <= 0) return null;
+  return (s[0].fullReps - s[2].fullReps) / s[0].fullReps >= 0.4 ? [s[0].fullReps, s[2].fullReps] : null;
+}
+
 export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: ProgressionCtx): Prescription {
   const d = defaultsFor(ex);
   const { repMin, repMax, restSec } = d;
@@ -79,9 +89,15 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
     why = "Same weight: last session didn't count (rest skipped / out of order)";
   } else if (last.sets.length >= last.prescription.sets
     && last.sets.every((s) => s.fullReps >= repMax && effectiveRir(s) >= 1)) {
-    weight = stepUp(lastTop, ex.increment, known);
-    increased = true;
-    why = `+${fmt(tenth(weight - lastTop))} kg: hit ${last.sets.map((s) => s.fullReps).join('/')} last time`;
+    if (lastTop === 0) {
+      // Bodyweight: no plates to add, so reps stay at the top and the note says how to make it harder.
+      targets = rep(repMax);
+      why = 'Top of the range at bodyweight: slow the reps down or hold a light plate';
+    } else {
+      weight = stepUp(lastTop, ex.increment, known);
+      increased = true;
+      why = `+${fmt(tenth(weight - lastTop))} kg: hit ${last.sets.map((s) => s.fullReps).join('/')} last time`;
+    }
   } else if (missedBottom(last, repMin)) {
     if (missedBottom(valid[1], repMin)) {
       scale = 0.925;
@@ -138,13 +154,16 @@ export function nextPrescription(ex: Exercise, history: ExerciseEntry[], ctx: Pr
   }
   why = prefix + why;
 
+  const fell = repFall(last);
+  if (fell) why += ` Reps fell ${fell[0]} → ${fell[1]} last time: rest the full timer and stop 1–2 reps short on set 1.`;
+
   if (isStalled(valid)) {
     suggestSwap = true;
     why += ' Stalled 3 sessions — consider a swap.';
   }
 
   return {
-    ...base, weight: scale < 1 ? scaleTo(weight * scale, ex.increment, known) : weight, targetReps: targets, why,
+    ...base, weight: scale < 1 && weight > 0 ? scaleTo(weight * scale, ex.increment, known) : weight, targetReps: targets, why,
     needsCalibration: false, suggestSwap,
   };
 }

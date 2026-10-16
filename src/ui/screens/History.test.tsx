@@ -70,3 +70,17 @@ describe('Progress highlights', () => {
     vi.useRealTimers();
   });
 });
+
+describe('Add workouts from a file', () => {
+  it('adds them to History without replacing anything', async () => {
+    await workout(T0, 50);
+    render(<App initial="settings" />);
+    const input = await screen.findByTestId('add-workouts-file');
+    const json = JSON.stringify({ format: 'lift-log-import', version: 1, sessions: [
+      { start: '2026-09-21T21:55:00+08:00', minutes: 40, type: 'push', exercises: [{ id: 'chestFly', sets: [[72, 7]] }] },
+    ] });
+    fireEvent.change(input, { target: { files: [new File([json], 'hevy-history.json', { type: 'application/json' })] } });
+    expect((await screen.findByRole('status')).textContent).toBe('Added 1 workout.');
+    expect(await db.sessions.count()).toBe(2);
+  });
+});

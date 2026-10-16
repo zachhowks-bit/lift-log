@@ -20,12 +20,12 @@ const rir = (name: string) => within(screen.getByRole('radiogroup', { name: 'Rep
 const log = () => fireEvent.click(screen.getByRole('button', { name: 'Log set 1' }));
 
 describe('SetRow', () => {
-  it('rejects 0 weight with a visible error and does not log', () => {
+  it('rejects a negative weight with a visible error and does not log', () => {
     const onLog = setup();
-    fireEvent.change(screen.getByLabelText('Weight (kg)'), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText('Weight (kg)'), { target: { value: '-2' } });
     fireEvent.click(rir('2'));
     log();
-    expect(screen.getByRole('alert').textContent).toBe('Enter a weight above 0.');
+    expect(screen.getByRole('alert').textContent).toBe('Enter a weight (0 for bodyweight).');
     expect(onLog).not.toHaveBeenCalled();
   });
 
@@ -57,5 +57,12 @@ describe('SetRow', () => {
   it('disables logging while locked', () => {
     setup({ locked: true });
     expect(screen.getByRole('button', { name: 'Log set 1' })).toHaveProperty('disabled', true);
+  });
+});
+
+describe('warmupText', () => {
+  it('rounds to the exercise increment', async () => {
+    const { warmupText } = await import('./ExerciseCard');
+    expect(warmupText(59, 2.5)).toBe('Warm up first: 30 kg × 8, then 45 kg × 4. Log them as Warm-up.');
   });
 });

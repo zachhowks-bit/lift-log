@@ -31,9 +31,9 @@ async function runSession(now: number, o: Partial<SetLog> = {}) {
 
 describe('validateSet', () => {
   it('rejects bad input', () => {
-    expect(validateSet(set({ weight: 0 }))).toBe('Enter a weight above 0.');
-    expect(validateSet({ ...set(), weight: undefined })).toBe('Enter a weight above 0.');
-    expect(validateSet(set({ weight: NaN }))).toBe('Enter a weight above 0.');
+    expect(validateSet(set({ weight: -1 }))).toBe('Enter a weight (0 for bodyweight).');
+    expect(validateSet({ ...set(), weight: undefined })).toBe('Enter a weight (0 for bodyweight).');
+    expect(validateSet(set({ weight: NaN }))).toBe('Enter a weight (0 for bodyweight).');
     expect(validateSet(set({ fullReps: -1 }))).toBe('Reps must be whole numbers, 0 or more.');
     expect(validateSet(set({ partialReps: -1 }))).toBe('Reps must be whole numbers, 0 or more.');
     expect(validateSet(set({ fullReps: 0, partialReps: 0 }))).toBe('Log at least 1 rep (full or partial).');
@@ -44,6 +44,7 @@ describe('validateSet', () => {
     expect(validateSet(set())).toBeNull();
     expect(validateSet(set({ fullReps: 0, partialReps: 1, rir: 0 }))).toBeNull();
     expect(validateSet(set({ kneePain: 0 }))).toBeNull();
+    expect(validateSet(set({ weight: 0 }))).toBeNull(); // bodyweight
   });
 });
 
@@ -97,7 +98,7 @@ describe('session flow', () => {
   it('never stores an invalid set', async () => {
     const s = await startNextSession(T0);
     const id = s.entries[0].exerciseId;
-    await expect(logSet(s.id!, id, set({ weight: 0 }), T0)).rejects.toThrow('Enter a weight above 0.');
+    await expect(logSet(s.id!, id, set({ weight: -5 }), T0)).rejects.toThrow('Enter a weight (0 for bodyweight).');
     await expect(logSet(s.id!, id, set({ fullReps: 0, partialReps: 0 }), T0)).rejects.toThrow();
     await expect(logSet(s.id!, 'nope', set(), T0)).rejects.toThrow();
     const back = await db.sessions.get(s.id!);
@@ -409,8 +410,8 @@ describe('editing', () => {
     const out = await editSet(s.id!, id, 0, { weight: 65, fullReps: 8, partialReps: 0, rir: 2, kneePain: null, kind: 'drop' });
     expect(out.entries[0].sets[0].weight).toBe(65);
     expect(out.entries[0].sets[0].kind).toBe('drop');
-    await expect(editSet(s.id!, id, 0, { weight: 0, fullReps: 8, partialReps: 0, rir: 2, kneePain: null }))
-      .rejects.toThrow('Enter a weight above 0.');
+    await expect(editSet(s.id!, id, 0, { weight: -1, fullReps: 8, partialReps: 0, rir: 2, kneePain: null }))
+      .rejects.toThrow('Enter a weight (0 for bodyweight).');
     await expect(editSet(s.id!, id, 5, { weight: 60, fullReps: 8, partialReps: 0, rir: 2, kneePain: null }))
       .rejects.toThrow('Set not found.');
     const back = await editSet(s.id!, id, 0, { weight: 65, fullReps: 8, partialReps: 0, rir: 2, kneePain: null, kind: undefined });
