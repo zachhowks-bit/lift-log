@@ -149,4 +149,14 @@ describe('Workout', () => {
     await vi.waitFor(async () => expect((await getActiveSession())!.entries[0].sets[1]).toMatchObject({ weight: 45, kind: 'drop' }));
     expect(within(card('Machine chest press')).getByText('1/3')).toBeTruthy(); // drop sets don't count toward the 3
   });
+
+  it('discards a started workout: nothing saved, the next workout stays the same', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard workout' }));
+    expect(await screen.findByRole('button', { name: 'Start' })).toBeTruthy();
+    expect(screen.getByText('Next: Push A — Chest focus')).toBeTruthy();
+    expect(await db.sessions.count()).toBe(0);
+  });
 });

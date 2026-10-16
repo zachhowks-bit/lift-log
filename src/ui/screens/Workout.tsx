@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { addCustomExercise, getExercises, slotName } from '../../state/library';
-import { deleteSet, editSet, finishSession, getActiveSession, logSet, skipRest, swapExercise } from '../../state/session';
+import { deleteSet, discardWorkout, editSet, finishSession, getActiveSession, logSet, skipRest, swapExercise } from '../../state/session';
 import { isWorking } from '../../engine/rules';
 import { defaultKneePain, swapOptions } from '../../state/workout';
 import type { Exercise, Session, SetLog } from '../../types';
@@ -140,6 +140,17 @@ export default function Workout({ onExit, onFinished, onError }: Props) {
     }
   };
 
+  const discard = async () => {
+    if (!session?.id) return;
+    if (!window.confirm('Discard this workout? Nothing from it is saved, and your next workout stays the same.')) return;
+    try {
+      await discardWorkout(session.id);
+      onExit();
+    } catch (e) {
+      onError(msg(e));
+    }
+  };
+
   const finish = async () => {
     if (!session?.id) return;
     if (session.entries.some((e) => e.sets.length === 0)
@@ -179,6 +190,9 @@ export default function Workout({ onExit, onFinished, onError }: Props) {
       ))}
       <button type="button" className="btn btn-finish" disabled={finishing} onClick={() => void finish()}>
         Finish workout
+      </button>
+      <button type="button" className="btn btn-danger" disabled={finishing} onClick={() => void discard()}>
+        Discard workout
       </button>
       {swapFor && (
         <SwapSheet fromName={swapName} options={options} onPick={(id, always) => void pickSwap(id, always)}
